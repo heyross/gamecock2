@@ -17,7 +17,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from urllib.error import HTTPError, URLError
 
-# Native Python modules
+# Native Python modulesss
 native_modules = [
     'csv', 'gc', 'glob', 'hashlib', 'itertools', 'logging', 'os', 're', 'shutil', 
     'sys', 'textwrap', 'threading', 'time', 'urllib.request', 'urllib.error', 'zipfile',
@@ -28,6 +28,43 @@ native_modules = [
 third_party_modules = [
     'chardet', 'pandas', 'requests', 'bs4', 'tqdm'
 ]
+# Constants
+ROOT_DIR = "./"
+FILELIST = os.path.join(ROOT_DIR, "filelist.txt")
+FORMD_SOURCE_DIR = os.path.join(ROOT_DIR, "SecFormD")
+NCEN_SOURCE_DIR = os.path.join(ROOT_DIR, "SecNcen")
+NPORT_SOURCE_DIR = os.path.join(ROOT_DIR, "SecNport")
+THRTNF_SOURCE_DIR = os.path.join(ROOT_DIR, "Sec13F")
+NMFP_SOURCE_DIR = os.path.join(ROOT_DIR, "SecNmfp")
+CREDIT_SOURCE_DIR = os.path.join(ROOT_DIR, "CREDITS")
+EQUITY_SOURCE_DIR = os.path.join(ROOT_DIR, "EQUITY")
+CFTC_EQUITY_SOURCE_DIR = os.path.join(ROOT_DIR, "CFTC_EQ")
+CFTC_CREDIT_SOURCE_DIR = os.path.join(ROOT_DIR, "CFTC_CR")
+CFTC_COMMODITIES_SOURCE_DIR = os.path.join(ROOT_DIR, "CFTC_CO")
+EDGAR_SOURCE_DIR = os.path.join(ROOT_DIR, "EDGAR")
+EXCHANGE_SOURCE_DIR = os.path.join(ROOT_DIR, "EXCHANGE")
+INSIDER_SOURCE_DIR = os.path.join(ROOT_DIR, "INSIDERS")
+directories = [
+    INSIDER_SOURCE_DIR,
+    EXCHANGE_SOURCE_DIR,
+    EDGAR_SOURCE_DIR,
+    EQUITY_SOURCE_DIR,
+    CREDIT_SOURCE_DIR,
+    CFTC_CREDIT_SOURCE_DIR,
+    CFTC_EQUITY_SOURCE_DIR,
+    CFTC_COMMODITIES_SOURCE_DIR,
+    NMFP_SOURCE_DIR,
+    THRTNF_SOURCE_DIR,
+    NPORT_SOURCE_DIR,
+    NCEN_SOURCE_DIR,
+    FORMD_SOURCE_DIR,
+]
+
+for directory in directories:
+    os.makedirs(directory, exist_ok=True)
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def check_and_install_modules():
     os_name = platform.system()
@@ -53,7 +90,6 @@ def check_and_install_modules():
                 print(f"{module} installed successfully.")
             except subprocess.CalledProcessError:
                 print(f"Failed to install {module}. Please install it manually.")
-
 def import_modules():
     global chardet, concurrent, requests, BeautifulSoup, tqdm, pd
 
@@ -67,38 +103,6 @@ def import_modules():
 
     # Specific imports from concurrent.futures
     from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-# Constants
-ROOT_DIR = "./"
-FILELIST = os.path.join(ROOT_DIR, "filelist.txt")
-FORMD_SOURCE_DIR = os.path.join(ROOT_DIR, "SecFormD")
-NCEN_SOURCE_DIR = os.path.join(ROOT_DIR, "SecNcen")
-NPORT_SOURCE_DIR = os.path.join(ROOT_DIR, "SecNport")
-THRTNF_SOURCE_DIR = os.path.join(ROOT_DIR, "Sec13F")
-NMFP_SOURCE_DIR = os.path.join(ROOT_DIR, "SecNmfp")
-CREDIT_SOURCE_DIR = os.path.join(ROOT_DIR, "CREDITS")
-EQUITY_SOURCE_DIR = os.path.join(ROOT_DIR, "EQUITY")
-EDGAR_SOURCE_DIR = os.path.join(ROOT_DIR, "EDGAR")
-EXCHANGE_SOURCE_DIR = os.path.join(ROOT_DIR, "EXCHANGE")
-INSIDER_SOURCE_DIR = os.path.join(ROOT_DIR, "INSIDERS")
-directories = [
-    INSIDER_SOURCE_DIR,
-    EXCHANGE_SOURCE_DIR,
-    EDGAR_SOURCE_DIR,
-    EQUITY_SOURCE_DIR,
-    CREDIT_SOURCE_DIR,
-    NMFP_SOURCE_DIR,
-    THRTNF_SOURCE_DIR,
-    NPORT_SOURCE_DIR,
-    NCEN_SOURCE_DIR,
-    FORMD_SOURCE_DIR,
-]
-
-for directory in directories:
-    os.makedirs(directory, exist_ok=True)
-
-# Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 def gamecock_ascii():
     print(r"""
                                                   __    
@@ -1016,68 +1020,55 @@ def download_credit_archives():
     else:
         print("Y not pushed. exiting.")
         exit(1)
-
 def credits_second():
     gamecat_ascii()
 
-    def process_zip(zip_file):
-        results = []
-        try:
-            with ZipFile(zip_file, 'r') as zip_ref:
-                csv_filename = zip_ref.namelist()[0]  # Assuming only one CSV per zip
-                with zip_ref.open(csv_filename) as csv_file:
-                    df = pd.read_csv(csv_file, low_memory=False)
-                    for column in df.columns:
-                        if column in df.columns and df[column].astype(str).str.contains(search_term, case=False, na=False).any():
-                            matching_rows = df[df[column].astype(str).str.contains(search_term, case=False, na=False)]
-                            results.extend(matching_rows.to_dict('records'))  # Convert matching rows to list of dicts
-                            break  # We've found a match, no need to check other columns
-        except Exception as e:
-            logging.error(f"Error processing {zip_file}: {e}")
-        return results, len(results)
+    def parse_zips_in_batches(batch_size=100):
+        master = pd.DataFrame()  # Start with an empty dataframe
+        zip_files = sorted(glob.glob(os.path.join(CREDIT_SOURCE_DIR, '*.zip')), key=lambda x: os.path.basename(x))
+        total_files = len(zip_files)
+        results_count = 0
+        
+        print(f"\nStarting to process {total_files} zip files...")
+        for i in range(0, total_files, batch_size):
+            batch = zip_files[i:i+batch_size]
+            for index, zip_file in enumerate(batch, 1):
+                print(f"\nProcessing file {i + index}/{total_files}: {zip_file}")
+                try:
+                    with ZipFile(zip_file, 'r') as zip_ref:
+                        csv_filename = zip_ref.namelist()[0]  # Assuming only one CSV per zip
+                        print(f"Reading CSV file: {csv_filename}")
+                        with zip_ref.open(csv_filename) as csv_file:
+                            df = pd.read_csv(csv_file, low_memory=False)
+                            match_found = False
+                            for column in df.columns:
+                                if column in df.columns and df[column].astype(str).str.contains(search_term, case=False, na=False).any():
+                                    print(f"Matches found in column: {column}")
+                                    matching_rows = df[df[column].astype(str).str.contains(search_term, case=False, na=False)]
+                                    master = pd.concat([master, matching_rows], ignore_index=True)
+                                    results_count += len(matching_rows)
+                                    match_found = True
+                                    print(f"Added {len(matching_rows)} matching rows. Total matches so far: {results_count}")
+                                    break  # We've found a match, no need to check other columns
+                            if not match_found:
+                                print(f"No matches found in {csv_filename}")         
+                except Exception as e:
+                    logging.error(f"Error processing {zip_file}: {e}")
+                    print(f"Error occurred while processing {zip_file}. Continuing to next file.")
+                print(f"Current matches count: {results_count}")
+            
+            # Optionally, save or perform operations on 'master' here if it's getting too large
+        return master, results_count
 
-    def write_to_csv(results, csv_writer):
-        for row in results:
-            csv_writer.writerow(row)
-
-    # Main execution
     print("Press Enter when you are ready to parse the files, or type 'q' to quit.")
     user_input = input()
     if user_input.lower() != 'q':
         search_term = input("Enter the search term: ").strip()
-        
-        zip_files = sorted(glob.glob(os.path.join(CREDIT_SOURCE_DIR, '*.zip')), key=lambda x: os.path.basename(x))
-        total_files = len(zip_files)
-        print(f"\nStarting to process {total_files} zip files with 16 worker threads...")
-
+        master, final_count = parse_zips_in_batches()
         master_csv_path = os.path.join(CREDIT_SOURCE_DIR, f"filtered_{search_term.replace(' ', '_')}.csv")
-        
-        with open(master_csv_path, 'w', newline='') as csvfile:
-            csv_writer = csv.DictWriter(csvfile, fieldnames=None)  # We'll define fieldnames later
-            header_written = False
-
-            with tqdm(total=total_files, desc="Processing Zips") as pbar:
-                with ThreadPoolExecutor(max_workers=16) as executor:
-                    future_to_zip = {executor.submit(process_zip, zip_file): zip_file for zip_file in zip_files}
-                    
-                    for future in as_completed(future_to_zip):
-                        zip_file = future_to_zip[future]
-                        try:
-                            results, count = future.result()
-                            if results and not header_written:
-                                # Write header only once
-                                csv_writer.fieldnames = results[0].keys()
-                                csv_writer.writeheader()
-                                header_written = True
-                            write_to_csv(results, csv_writer)
-                            pbar.set_postfix({'file': os.path.basename(zip_file), 'matches': count})
-                            pbar.update(1)
-                            print(f"Processed: {zip_file} - Matches found: {count}")
-                        except Exception as e:
-                            print(f"Exception in {zip_file}: {e}")
-                            pbar.update(1)  # Still update progress bar even if there's an error
-
-            print(f"\nSaving results to: {master_csv_path}")
+        master.to_csv(master_csv_path, index=False)
+        print(f"\nSaving results to: {master_csv_path}")
+        print(f"Total Matches Found: {final_count}")
         logging.info(f"Parsing completed. Master file saved as {master_csv_path}")
     else:
         print("Exiting script.")
@@ -1140,6 +1131,366 @@ def download_equities_archives():
         exit(1)
 def equities_second():
     gamecat_ascii()
+    
+    def parse_zips():
+        master = pd.DataFrame()  # Start with an empty dataframe
+        zip_files = sorted(glob.glob(os.path.join(EQUITY_SOURCE_DIR, '*.zip')), key=lambda x: os.path.basename(x))  # Sort by filename to keep dates in order
+        first_file_processed = False
+        first_headers = None
+        total_files = len(zip_files)
+        results_count = 0
+        print(f"\nStarting to process {total_files} zip files...")
+        for index, zip_file in enumerate(zip_files, 1):
+            print(f"\nProcessing file {index}/{total_files}: {zip_file}")
+            try:
+                with ZipFile(zip_file, 'r') as zip_ref:
+                    csv_filename = zip_ref.namelist()[0]  # Assuming only one CSV per zip
+                    print(f"Reading CSV file: {csv_filename}")
+                    with zip_ref.open(csv_filename) as csv_file:
+                        df = pd.read_csv(csv_file, low_memory=False)
+                        if not first_file_processed:
+                            first_headers = df.columns.tolist()
+                            first_file_processed = True
+                        match_found = False
+                        for column in df.columns:
+                            if column in df.columns and df[column].astype(str).str.contains(search_term, case=False, na=False).any():
+                                print(f"Matches found in column: {column}")
+                                matching_rows = df[df[column].astype(str).str.contains(search_term, case=False, na=False)]
+                                master = pd.concat([master, matching_rows], ignore_index=True)
+                                results_count += len(matching_rows)
+                                match_found = True
+                                print(f"Added {len(matching_rows)} matching rows. Total matches so far: {results_count}")
+                                break  # We've found a match, no need to check other columns
+                        if not match_found:
+                            print(f"No matches found in {csv_filename}")         
+            except Exception as e:
+                logging.error(f"Error processing {zip_file}: {e}")
+                print(f"Error occurred while processing {zip_file}. Continuing to next file.")
+            print(f"Current matches count: {results_count}")
+        
+        # If we have processed at least one file, ensure the CSV starts with the first file's headers
+        if first_headers:
+            master = master.reindex(columns=first_headers, fill_value=None)  # Use None or pd.NA instead of pd.np.nan
+        return master, results_count
+
+    print("Press Enter when you are ready to parse the files, or type 'q' to quit.")
+    user_input = input()
+    if user_input.lower() != 'q':
+        search_term = input("Enter the search term: ").strip()
+        master, final_count = parse_zips()
+        master_csv_path = os.path.join(EQUITY_SOURCE_DIR, f"filtered_{search_term.replace(' ', '_')}.csv")
+        master.to_csv(master_csv_path, index=False)
+        print(f"\nSaving results to: {master_csv_path}")
+        print(f"Total Matches Found: {final_count}")
+        logging.info(f"Parsing completed. Master file saved as {master_csv_path}")
+    else:
+        print("Exiting script.")
+def download_cftc_credit_archives():
+    os.makedirs(CFTC_CREDIT_SOURCE_DIR, exist_ok=True)
+    gamecat_ascii()
+    def generate_urls(start_date, end_date):
+        url_list = []
+        current_date = start_date
+        base_url = "https://pddata.dtcc.com/ppd/api/report/cumulative/cftc/CFTC_CUMULATIVE_CREDITS_"
+        while current_date <= end_date:
+            date_str = current_date.strftime('%Y_%m_%d')
+            url_list.append(f"{base_url}{date_str}.zip")
+            current_date += timedelta(days=1)
+        return url_list
+
+    def download_zip_with_rate_limit(url):
+        zip_filename = url.split('/')[-1]
+        temp_zip_path = os.path.join(CFTC_CREDIT_SOURCE_DIR, zip_filename)
+        
+        print(f"Attempting to download: {zip_filename}")
+        
+        if os.path.exists(temp_zip_path):
+            logging.info(f"Skipping download of {zip_filename} as it already exists.")
+            return
+
+        try:
+            req = requests.get(url, stream=True)
+            req.raise_for_status()  # Raise an exception for bad status codes
+            file_size = int(req.headers.get('Content-Length', 0))
+            
+            with open(temp_zip_path, 'wb') as f:
+                for chunk in req.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            file_size_downloaded = os.path.getsize(temp_zip_path)
+            download_time = datetime.now()
+            
+            logging.info(f"Downloaded: {url}")
+            logging.info(f"Destination: {temp_zip_path}")
+            logging.info(f"Timestamp: {download_time}")
+            logging.info(f"Size: {file_size_downloaded} bytes")
+            logging.info(f"Expected Size: {file_size} bytes")
+            logging.info(f"File size match: {file_size == file_size_downloaded}")
+            
+            print(f"Successfully downloaded: {zip_filename}")
+            # Add a small delay to avoid overwhelming the server
+            time.sleep(1)  # Sleep for 1 second
+            
+        except requests.RequestException as e:
+            logging.error(f"Failed to download {url}: {e}")
+            print(f"Failed to download: {zip_filename}")
+
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=2*365)  # Approximately 2 years back, accounting for leap years
+    urls = generate_urls(start_date, end_date)
+
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        futures = [executor.submit(download_zip_with_rate_limit, url) for url in urls]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Error in thread: {e}")
+
+    print("Downloads completed.")
+    # Display numbered prompt for archive type selection
+    #print("Would you like to search? (y)es or (n)o?:")
+    
+    creditquery = input("Would you like to search? (y)es or (n)o?:").strip()
+    if creditquery == 'y':
+        CFTC_credits_second()
+    else:
+        print("Y not pushed. exiting.")
+        exit(1)
+def CFTC_credits_second():
+    gamecat_ascii()
+
+    def parse_zips_in_batches(batch_size=100):
+        master = pd.DataFrame()  # Start with an empty dataframe
+        zip_files = sorted(glob.glob(os.path.join(CFTC_CREDIT_SOURCE_DIR, '*.zip')), key=lambda x: os.path.basename(x))
+        total_files = len(zip_files)
+        results_count = 0
+        
+        print(f"\nStarting to process {total_files} zip files...")
+        for i in range(0, total_files, batch_size):
+            batch = zip_files[i:i+batch_size]
+            for index, zip_file in enumerate(batch, 1):
+                print(f"\nProcessing file {i + index}/{total_files}: {zip_file}")
+                try:
+                    with ZipFile(zip_file, 'r') as zip_ref:
+                        csv_filename = zip_ref.namelist()[0]  # Assuming only one CSV per zip
+                        print(f"Reading CSV file: {csv_filename}")
+                        with zip_ref.open(csv_filename) as csv_file:
+                            df = pd.read_csv(csv_file, low_memory=False)
+                            match_found = False
+                            for column in df.columns:
+                                if column in df.columns and df[column].astype(str).str.contains(search_term, case=False, na=False).any():
+                                    print(f"Matches found in column: {column}")
+                                    matching_rows = df[df[column].astype(str).str.contains(search_term, case=False, na=False)]
+                                    master = pd.concat([master, matching_rows], ignore_index=True)
+                                    results_count += len(matching_rows)
+                                    match_found = True
+                                    print(f"Added {len(matching_rows)} matching rows. Total matches so far: {results_count}")
+                                    break  # We've found a match, no need to check other columns
+                            if not match_found:
+                                print(f"No matches found in {csv_filename}")         
+                except Exception as e:
+                    logging.error(f"Error processing {zip_file}: {e}")
+                    print(f"Error occurred while processing {zip_file}. Continuing to next file.")
+                print(f"Current matches count: {results_count}")
+            
+            # Optionally, save or perform operations on 'master' here if it's getting too large
+        return master, results_count
+
+    print("Press Enter when you are ready to parse the files, or type 'q' to quit.")
+    user_input = input()
+    if user_input.lower() != 'q':
+        search_term = input("Enter the search term: ").strip()
+        master, final_count = parse_zips_in_batches()
+        master_csv_path = os.path.join(CFTC_CREDIT_SOURCE_DIR, f"filtered_{search_term.replace(' ', '_')}.csv")
+        master.to_csv(master_csv_path, index=False)
+        print(f"\nSaving results to: {master_csv_path}")
+        print(f"Total Matches Found: {final_count}")
+        logging.info(f"Parsing completed. Master file saved as {master_csv_path}")
+    else:
+        print("Exiting script.")
+def download_cftc_commodities_archives():
+    os.makedirs(CFTC_COMMODITIES_SOURCE_DIR, exist_ok=True)
+    gamecat_ascii()
+    def generate_urls(start_date, end_date):
+        url_list = []
+        current_date = start_date
+        base_url = "https://pddata.dtcc.com/ppd/api/report/cumulative/cftc/CFTC_CUMULATIVE_COMMODITIES_"
+        while current_date <= end_date:
+            date_str = current_date.strftime('%Y_%m_%d')
+            url_list.append(f"{base_url}{date_str}.zip")
+            current_date += timedelta(days=1)
+        return url_list
+    def download_zip_with_rate_limit(url):
+        zip_filename = url.split('/')[-1]
+        temp_zip_path = os.path.join(CFTC_COMMODITIES_SOURCE_DIR, zip_filename)
+        
+        print(f"Attempting to download: {zip_filename}")
+        
+        if os.path.exists(temp_zip_path):
+            logging.info(f"Skipping download of {zip_filename} as it already exists.")
+            return
+
+        try:
+            req = requests.get(url, stream=True)
+            req.raise_for_status()  # Raise an exception for bad status codes
+            file_size = int(req.headers.get('Content-Length', 0))
+            
+            with open(temp_zip_path, 'wb') as f:
+                for chunk in req.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            file_size_downloaded = os.path.getsize(temp_zip_path)
+            download_time = datetime.now()
+            
+            logging.info(f"Downloaded: {url}")
+            logging.info(f"Destination: {temp_zip_path}")
+            logging.info(f"Timestamp: {download_time}")
+            logging.info(f"Size: {file_size_downloaded} bytes")
+            logging.info(f"Expected Size: {file_size} bytes")
+            logging.info(f"File size match: {file_size == file_size_downloaded}")
+            
+            print(f"Successfully downloaded: {zip_filename}")
+            # Add a small delay to avoid overwhelming the server
+            time.sleep(1)  # Sleep for 1 second
+            
+        except requests.RequestException as e:
+            logging.error(f"Failed to download {url}: {e}")
+            print(f"Failed to download: {zip_filename}")
+
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=2*365)  # Approximately 2 years back, accounting for leap years
+    urls = generate_urls(start_date, end_date)
+
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        futures = [executor.submit(download_zip_with_rate_limit, url) for url in urls]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Error in thread: {e}")
+
+    print("Downloads completed.")
+    # Display numbered prompt for archive type selection
+    #print("Would you like to search? (y)es or (n)o?:")
+    
+    creditquery = input("Would you like to search? (y)es or (n)o?:").strip()
+    if creditquery == 'y':
+        CFTC_commodities_second()
+    else:
+        print("Y not pushed. exiting.")
+        exit(1)
+def CFTC_commodities_second():
+    gamecat_ascii()
+
+    def parse_zips_in_batches(batch_size=100):
+        master = pd.DataFrame()  # Start with an empty dataframe
+        zip_files = sorted(glob.glob(os.path.join(CFTC_COMMODITIES_SOURCE_DIR, '*.zip')), key=lambda x: os.path.basename(x))
+        total_files = len(zip_files)
+        results_count = 0
+        
+        print(f"\nStarting to process {total_files} zip files...")
+        for i in range(0, total_files, batch_size):
+            batch = zip_files[i:i+batch_size]
+            for index, zip_file in enumerate(batch, 1):
+                print(f"\nProcessing file {i + index}/{total_files}: {zip_file}")
+                try:
+                    with ZipFile(zip_file, 'r') as zip_ref:
+                        csv_filename = zip_ref.namelist()[0]  # Assuming only one CSV per zip
+                        print(f"Reading CSV file: {csv_filename}")
+                        with zip_ref.open(csv_filename) as csv_file:
+                            df = pd.read_csv(csv_file, low_memory=False)
+                            match_found = False
+                            for column in df.columns:
+                                if column in df.columns and df[column].astype(str).str.contains(search_term, case=False, na=False).any():
+                                    print(f"Matches found in column: {column}")
+                                    matching_rows = df[df[column].astype(str).str.contains(search_term, case=False, na=False)]
+                                    master = pd.concat([master, matching_rows], ignore_index=True)
+                                    results_count += len(matching_rows)
+                                    match_found = True
+                                    print(f"Added {len(matching_rows)} matching rows. Total matches so far: {results_count}")
+                                    break  # We've found a match, no need to check other columns
+                            if not match_found:
+                                print(f"No matches found in {csv_filename}")         
+                except Exception as e:
+                    logging.error(f"Error processing {zip_file}: {e}")
+                    print(f"Error occurred while processing {zip_file}. Continuing to next file.")
+                print(f"Current matches count: {results_count}")
+            
+            # Optionally, save or perform operations on 'master' here if it's getting too large
+        return master, results_count
+
+    print("Press Enter when you are ready to parse the files, or type 'q' to quit.")
+    user_input = input()
+    if user_input.lower() != 'q':
+        search_term = input("Enter the search term: ").strip()
+        master, final_count = parse_zips_in_batches()
+        master_csv_path = os.path.join(CFTC_CREDIT_SOURCE_DIR, f"filtered_{search_term.replace(' ', '_')}.csv")
+        master.to_csv(master_csv_path, index=False)
+        print(f"\nSaving results to: {master_csv_path}")
+        print(f"Total Matches Found: {final_count}")
+        logging.info(f"Parsing completed. Master file saved as {master_csv_path}")
+    else:
+        print("Exiting script.")
+def download_cftc_equities_archives():
+    os.makedirs(CFTC_EQUITY_SOURCE_DIR, exist_ok=True)
+
+    def generate_urls(start_date, end_date):
+        url_list = []
+        current_date = start_date
+        base_url = "https://pddata.dtcc.com/ppd/api/report/cumulative/cftc/CFTC_CUMULATIVE_EQUITIES_"
+        while current_date <= end_date:
+            date_str = current_date.strftime('%Y_%m_%d')
+            url_list.append(f"{base_url}{date_str}.zip")
+            current_date += timedelta(days=1)
+        return url_list
+
+    def download_zip(url):
+        zip_filename = url.split('/')[-1]
+        temp_zip_path = os.path.join(CFTC_EQUITY_SOURCE_DIR, zip_filename)
+        
+        if os.path.exists(temp_zip_path):
+            logging.info(f"Skipping download of {zip_filename} as it already exists.")
+            return
+
+        try:
+            req = requests.get(url, stream=True)
+            req.raise_for_status()  # Raise an exception for bad status codes
+            file_size = int(req.headers.get('Content-Length', 0))
+            
+            with open(temp_zip_path, 'wb') as f:
+                for chunk in req.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            file_size_downloaded = os.path.getsize(temp_zip_path)
+            download_time = datetime.now()
+            
+            logging.info(f"Downloaded: {url}")
+            logging.info(f"Destination: {temp_zip_path}")
+            logging.info(f"Timestamp: {download_time}")
+            logging.info(f"Size: {file_size_downloaded} bytes")
+            logging.info(f"Expected Size: {file_size} bytes")
+            logging.info(f"File size match: {file_size == file_size_downloaded}")
+            
+        except requests.RequestException as e:
+            logging.error(f"Failed to download {url}: {e}")
+
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=2*365)  # Approximately 2 years back, accounting for leap years
+    urls = generate_urls(start_date, end_date)
+
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        list(executor.map(download_zip, urls))  # Use list() to ensure all tasks are completed before moving on
+
+    print("Downloads completed.")
+    equitytquery = input("Would you like to search? (y)es or (n)o?:").strip()
+    if equitytquery == 'y':
+        cftc_equities_second()
+    else:
+        print("Y not pushed. exiting.")
+        exit(1)
+def cftc_equities_second():
+    gamecat_ascii()
 
     def process_zip(zip_file):
         results = []
@@ -1155,7 +1506,7 @@ def equities_second():
                             break  # We've found a match, no need to check other columns
         except Exception as e:
             logging.error(f"Error processing {zip_file}: {e}")
-        return results, len(results)
+        return results
 
     def write_to_csv(results, csv_writer):
         for row in results:
@@ -1166,43 +1517,38 @@ def equities_second():
     user_input = input()
     if user_input.lower() != 'q':
         search_term = input("Enter the search term: ").strip()
-        
-        zip_files = sorted(glob.glob(os.path.join(EQUITY_SOURCE_DIR, '*.zip')), key=lambda x: os.path.basename(x))
+        zip_files = sorted(glob.glob(os.path.join(CFTC_EQUITY_SOURCE_DIR, '*.zip')), key=lambda x: os.path.basename(x))
         total_files = len(zip_files)
-        print(f"\nStarting to process {total_files} zip files with 16 worker threads...")
+        print(f"\nStarting to process {total_files} zip files with 7 worker threads...")
 
-        master_csv_path = os.path.join(EQUITY_SOURCE_DIR, f"filtered_{search_term.replace(' ', '_')}.csv")
+        master_csv_path = os.path.join(CFTC_EQUITY_SOURCE_DIR, f"filtered_{search_term.replace(' ', '_')}.csv")
         
         with open(master_csv_path, 'w', newline='') as csvfile:
             csv_writer = csv.DictWriter(csvfile, fieldnames=None)  # We'll define fieldnames later
             header_written = False
 
-            with tqdm(total=total_files, desc="Processing Zips") as pbar:
-                with ThreadPoolExecutor(max_workers=16) as executor:
-                    future_to_zip = {executor.submit(process_zip, zip_file): zip_file for zip_file in zip_files}
-                    
-                    for future in as_completed(future_to_zip):
-                        zip_file = future_to_zip[future]
-                        try:
-                            results, count = future.result()
-                            if results and not header_written:
-                                # Write header only once
-                                csv_writer.fieldnames = results[0].keys()
-                                csv_writer.writeheader()
-                                header_written = True
-                            write_to_csv(results, csv_writer)
-                            pbar.set_postfix({'file': os.path.basename(zip_file), 'matches': count})
-                            pbar.update(1)
-                            print(f"Processed: {zip_file} - Matches found: {count}")
-                        except Exception as e:
-                            print(f"Exception in {zip_file}: {e}")
-                            pbar.update(1)  # Still update progress bar even if there's an error
-
+            with ThreadPoolExecutor(max_workers=7) as executor:
+                # Process zip files
+                future_to_zip = {executor.submit(process_zip, zip_file): zip_file for zip_file in zip_files}
+                
+                for future in as_completed(future_to_zip):
+                    zip_file = future_to_zip[future]
+                    try:
+                        results = future.result()
+                        if results and not header_written:
+                            # Write header only once
+                            csv_writer.fieldnames = results[0].keys()
+                            csv_writer.writeheader()
+                            header_written = True
+                        write_to_csv(results, csv_writer)
+                        print(f"Processed: {zip_file}")
+                    except Exception as e:
+                        print(f"Exception in {zip_file}: {e}")
+            
             print(f"\nSaving results to: {master_csv_path}")
         logging.info(f"Parsing completed. Master file saved as {master_csv_path}")
     else:
         print("Exiting script.")
-
 def download_ncen_archives():
     BASE_URL = "https://www.sec.gov/files/dera/data/form-n-cen-data-sets/"
     urls = [
@@ -1227,6 +1573,7 @@ def download_ncen_archives():
         BASE_URL + "2024q1_ncen.zip",
         BASE_URL + "2024q2_ncen.zip",
         BASE_URL + "2024q3_ncen.zip",
+        BASE_URL + "2024q4_ncen.zip",
     ]
     
     download_archives(NCEN_SOURCE_DIR, FILELIST, urls)
@@ -2017,12 +2364,13 @@ def edgar_third(csv_file, method):
                     with urllib.request.urlopen(req, timeout=10) as response:
                         if response.getcode() != 200:
                             raise HTTPError(url, response.getcode(), "Non-200 status code", headers, None)
-                    
+                        file_content = response.read()  # Store the file content
+
                         filename = os.path.join(directory, os.path.basename(url))
                         with open(filename, 'wb') as file:
                             file.write(response.read())  # Changed from response.content to response.read()
                         print(f"Downloaded: {filename}")
-                        md5_hash = hashlib.md5(content).hexdigest()
+                        md5_hash = hashlib.md5(file_content).hexdigest()
                         timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
                         log_filename = os.path.join(directory, os.path.splitext(os.path.basename(url))[0] + '-legal-source-log.txt')
                         with open(log_filename, 'w') as log_file:
@@ -2212,12 +2560,13 @@ def download_file(url, directory, retries=3, delay=1):
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.getcode() != 200:
                     raise HTTPError(url, response.getcode(), "Non-200 status code", headers, None)
-            
+                file_content = response.read()  # Store the file content
+
                 filename = os.path.join(directory, os.path.basename(url))
                 with open(filename, 'wb') as file:
                     file.write(response.read())  # Changed from response.content to response.read()
                 print(f"Downloaded: {filename}")
-                md5_hash = hashlib.md5(content).hexdigest()
+                md5_hash = hashlib.md5(file_content).hexdigest()
                 timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
                 log_filename = os.path.join(directory, os.path.splitext(os.path.basename(url))[0] + '-legal-source-log.txt')
                 with open(log_filename, 'w') as log_file:
@@ -2437,11 +2786,11 @@ def process_zips(url, max_retries=3, timeout=10):
                 return None
             time.sleep(2 ** attempt)
     return None
-def search_for_swaps(zip_file, verbose=False, debug=True):
+def search_nport_swaps(zip_file, verbose=False, debug=True):
     import tqdm, pandas as pd
     summary = []
     if verbose:
-        print(f"Starting search_for_swaps for {zip_file}")
+        print(f"Starting {zip_file}")
     
     try:
         base_name = os.path.basename(zip_file)
@@ -2605,10 +2954,1109 @@ def search_for_swaps(zip_file, verbose=False, debug=True):
             print(f"Error processing {zip_file}: {str(e)}")
     
     return summary
+def search_nport(search_keywords, verbose=False, search_for_swaps=False):
+    import tqdm, concurrent.futures, pandas as pd
+    secnport_path = os.path.join(ROOT_DIR, "SecNport")
+    os.makedirs(secnport_path, exist_ok=True)
+    
+    zip_files = [os.path.join(secnport_path, f) for f in os.listdir(secnport_path) if f.endswith('.zip')]
+    zip_files = [os.path.normpath(path) for path in zip_files]
+    search_terms = [term.strip() for term in search_keywords.split(',')]
+    
+    output_file = os.path.join(ROOT_DIR, f"{search_keywords.replace(',', '_')}_summary_results.csv")
+
+    with open(output_file, 'w', newline='') as csvfile:
+        headers = ['ACCESSION_NUMBER', 'HOLDING_ID', 'FILENAME_TIMESTAMP', 'ISSUER_NAME', 'ISSUER_LEI', 
+                   'ISSUER_TITLE', 'ISSUER_CUSIP', 'BALANCE', 'UNIT', 'OTHER_UNIT_DESC', 'CURRENCY_CODE', 
+                   'CURRENCY_VALUE', 'EXCHANGE_RATE', 'PERCENTAGE', 'PAYOFF_PROFILE', 'ASSET_CAT', 
+                   'OTHER_ASSET', 'ISSUER_TYPE', 'OTHER_ISSUER', 'INVESTMENT_COUNTRY', 
+                   'IS_RESTRICTED_SECURITY', 'FAIR_VALUE_LEVEL', 'DERIVATIVE_CAT', 
+                   'CIK', 'REGISTRANT_NAME', 'FILE_NUM', 'LEI', 'ADDRESS1', 'ADDRESS2', 'CITY', 'STATE', 
+                   'COUNTRY', 'ZIP', 'PHONE', 'YYYYQQ']
+        
+        pd.DataFrame(columns=headers).to_csv(csvfile, index=False, header=True, mode='w')
+
+        if verbose:
+            with tqdm.tqdm(total=len(zip_files), desc="Files Processed", unit="file") as file_progress:
+                with ProcessPoolExecutor() as executor:
+                    futures = [executor.submit(process_ncen, file, search_terms, verbose) for file in zip_files]
+
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            results = future.result()
+                            for date, item in results:
+                                df = pd.DataFrame([item])
+                                df.to_csv(csvfile, index=False, header=False, mode='a')
+                                if verbose:
+                                    print(f"Wrote item with date {date} to CSV")
+                        except Exception as e:
+                            if verbose:
+                                print(f"An error occurred while processing a file: {str(e)}")
+                        finally:
+                            if verbose:
+                                file_progress.update(1)
+
+    gc.collect()  # Memory management
+def search_ncen_data(zip_file, verbose=False, debug=True):
+    import tqdm, pandas as pd
+    from collections import defaultdict
+    import zipfile
+
+    all_data = defaultdict(list)
+    if verbose:
+        print(f"Starting to parse NCEN data for {zip_file}")
+
+    try:
+        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+            dataset_files = {
+                'SUBMISSION': 'SUBMISSION.tsv',
+                'REGISTRANT': 'REGISTRANT.tsv',
+                'REGISTRANT_WEBSITE': 'REGISTRANT_WEBSITE.tsv',
+                'LOCATION_BOOKS_RECORD': 'LOCATION_BOOKS_RECORD.tsv',
+                'TERMINATED_ORGANIZATION': 'TERMINATED_ORGANIZATION.tsv',
+                'DIRECTOR': 'DIRECTOR.tsv',
+                'DIRECTOR_FILE_NUMBER': 'DIRECTOR_FILE_NUMBER.tsv',
+                'CHIEF_COMPLIANCE_OFFICER': 'CHIEF_COMPLIANCE_OFFICER.tsv',
+                'CCO_EMPLOYER': 'CCO_EMPLOYER.tsv',
+                'REGISTRANT_REPORTING_SERIES': 'REGISTRANT_REPORTING_SERIES.tsv',
+                'RELEASE_NUMBER': 'RELEASE_NUMBER.tsv',
+                'PRINCIPAL_UNDERWRITER': 'PRINCIPAL_UNDERWRITER.tsv',
+                'PUBLIC_ACCOUNTANT': 'PUBLIC_ACCOUNTANT.tsv',
+                'VALUATION_METHOD_CHANGE': 'VALUATION_METHOD_CHANGE.tsv',
+                'VALUATION_METHOD_CHANGE_SERIES': 'VALUATION_METHOD_CHANGE_SERIES.tsv',
+                'FUND_REPORTED_INFO': 'FUND_REPORTED_INFO.tsv',
+                'SHARES_OUTSTANDING': 'SHARES_OUTSTANDING.tsv',
+                'FEEDER_FUNDS': 'FEEDER_FUNDS.tsv',
+                'MASTER_FUNDS': 'MASTER_FUNDS.tsv',
+                'FOREIGN_INVESTMENT': 'FOREIGN_INVESTMENT.tsv',
+                'SECURITY_LENDING': 'SECURITY_LENDING.tsv',
+                'SEC_LENDING_INDEMNITY_PROVIDER': 'SEC_LENDING_INDEMNITY_PROVIDER.tsv',
+                'COLLATERAL_MANAGER': 'COLLATERAL_MANAGER.tsv',
+                'ADVISER': 'ADVISER.tsv',
+                'TRANSFER_AGENT': 'TRANSFER_AGENT.tsv',
+                'PRICING_SERVICE': 'PRICING_SERVICE.tsv',
+                'CUSTODIAN': 'CUSTODIAN.tsv',
+                'SHAREHOLDER_SERVICING_AGENT': 'SHAREHOLDER_SERVICING_AGENT.tsv',
+                'ADMIN': 'ADMIN.tsv',
+                'BROKER_DEALER': 'BROKER_DEALER.tsv',
+                'BROKER': 'BROKER.tsv',
+                'PRINCIPAL_TRANSACTION': 'PRINCIPAL_TRANSACTION.tsv',
+                'LINE_OF_CREDIT_DETAIL': 'LINE_OF_CREDIT_DETAIL.tsv',
+                'LINE_OF_CREDIT_INSTITUTION': 'LINE_OF_CREDIT_INSTITUTION.tsv',
+                'CREDIT_USER': 'CREDIT_USER.tsv',
+                'INTER_FUND_LENDING_DETAIL': 'INTER_FUND_LENDING_DETAIL.tsv',
+                'INTER_FUND_BORROWING_DETAIL': 'INTER_FUND_BORROWING_DETAIL.tsv',
+                'SECURITY_RELATED_ITEM': 'SECURITY_RELATED_ITEM.tsv',
+                'RIGHTS_OFFERING_FUND': 'RIGHTS_OFFERING_FUND.tsv',
+                'LONGTERM_DEBT_DEFAULT': 'LONGTERM_DEBT_DEFAULT.tsv',
+                'DIVIDENDS_IN_ARREAR': 'DIVIDENDS_IN_ARREAR.tsv',
+                'SECURITY_EXCHANGE': 'SECURITY_EXCHANGE.tsv',
+                'AUTHORIZED_PARTICIPANT': 'AUTHORIZED_PARTICIPANT.tsv',
+                'ETF': 'ETF.tsv',
+                'DEPOSITOR': 'DEPOSITOR.tsv',
+                'UIT_ADMIN': 'UIT_ADMIN.tsv',
+                'UIT': 'UIT.tsv',
+                'SERIES_CIK': 'SERIES_CIK.tsv',
+                'SPONSOR': 'SPONSOR.tsv',
+                'TRUSTEE': 'TRUSTEE.tsv',
+                'CONTRACT_SECURITY': 'CONTRACT_SECURITY.tsv',
+                'DIVESTMENT': 'DIVESTMENT.tsv',
+                'REGISTRANT_HELDS_SECURITY': 'REGISTRANT_HELDS_SECURITY.tsv'
+            }
+
+            for dataset_name, file_name in dataset_files.items():
+                if file_name in zip_ref.namelist():
+                    chunksize = 100000  # Adjust based on memory usage
+                    total_rows = 0
+                    with zip_ref.open(file_name) as tsvfile:
+                        total_rows = sum(1 for _ in tsvfile)  # Count lines for progress estimation
+
+                    with tqdm.tqdm(total=total_rows, desc=f"Processing {file_name}", unit="row") as pbar:
+                        for chunk in pd.read_csv(zip_ref.open(file_name), delimiter='\t', chunksize=chunksize, low_memory=False):
+                            # Assuming all fields are strings or can be treated as such for simplicity
+                            chunk = chunk.fillna('').astype(str)
+                            
+                            # Specific parsing for each dataset
+                            if dataset_name == 'SUBMISSION':
+                                for index, row in chunk.iterrows():
+                                    submission_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'SUBMISSION_TYPE': row['SUBMISSION_TYPE'],
+                                        'CIK': row['CIK'],
+                                        'FILING_DATE': row['FILING_DATE'],
+                                        'REPORT_ENDING_PERIOD': row['REPORT_ENDING_PERIOD'],
+                                        'IS_REPORT_PERIOD_LT_12MONTH': row['IS_REPORT_PERIOD_LT_12MONTH'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'REGISTRANT_SIGNED_NAME': row['REGISTRANT_SIGNED_NAME'],
+                                        'DATE_SIGNED': row['DATE_SIGNED'],
+                                        'SIGNATURE': row['SIGNATURE'],
+                                        'TITLE': row['TITLE'],
+                                        'IS_LEGAL_PROCEEDINGS': row['IS_LEGAL_PROCEEDINGS'],
+                                        'IS_PROVISION_FINANCIAL_SUPPORT': row['IS_PROVISION_FINANCIAL_SUPPORT'],
+                                        'IS_IPA_REPORT_INTERNAL_CONTROL': row['IS_IPA_REPORT_INTERNAL_CONTROL'],
+                                        'IS_CHANGE_ACC_PRINCIPLES': row['IS_CHANGE_ACC_PRINCIPLES'],
+                                        'IS_INFO_REQUIRED_EO': row['IS_INFO_REQUIRED_EO'],
+                                        'IS_OTHER_INFO_REQUIRED': row['IS_OTHER_INFO_REQUIRED'],
+                                        'IS_MATERIAL_AMENDMENTS': row['IS_MATERIAL_AMENDMENTS'],
+                                        'IS_INST_DEFINING_RIGHTS': row['IS_INST_DEFINING_RIGHTS'],
+                                        'IS_NEW_OR_AMENDED_INV_ADV_CONT': row['IS_NEW_OR_AMENDED_INV_ADV_CONT'],
+                                        'IS_INFO_ITEM405': row['IS_INFO_ITEM405'],
+                                        'IS_CODE_OF_ETHICS': row['IS_CODE_OF_ETHICS']
+                                    }
+                                    all_data[dataset_name].append(submission_data)
+                                    pbar.update(1)
+                            
+                            elif dataset_name == 'REGISTRANT':
+                                for index, row in chunk.iterrows():
+                                    registrant_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'REGISTRANT_NAME': row['REGISTRANT_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'CIK': row['CIK'],
+                                        'LEI': row['LEI'],
+                                        'ADDRESS1': row['ADDRESS1'],
+                                        'ADDRESS2': row['ADDRESS2'],
+                                        'CITY': row['CITY'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'ZIP': row['ZIP'],
+                                        'PHONE': row['PHONE'],
+                                        'IS_FIRST_FILING': row['IS_FIRST_FILING'],
+                                        'IS_LAST_FILING': row['IS_LAST_FILING'],
+                                        'IS_FAMILY_INVESTMENT_COMPANY': row['IS_FAMILY_INVESTMENT_COMPANY'],
+                                        'FAMILY_INVESTMENT_COMPANY_NAME': row['FAMILY_INVESTMENT_COMPANY_NAME'],
+                                        'INVESTMENT_COMPANY_TYPE': row['INVESTMENT_COMPANY_TYPE'],
+                                        'TOTAL_SERIES': row['TOTAL_SERIES'],
+                                        'IS_REGISTERED_UNDER_ACT_1933': row['IS_REGISTERED_UNDER_ACT_1933'],
+                                        'HAS_SECURITY_HOLDER_VOTE': row['HAS_SECURITY_HOLDER_VOTE'],
+                                        'HAS_LEGAL_PROCEEDING': row['HAS_LEGAL_PROCEEDING'],
+                                        'IS_PROCEEDING_TERMINATED': row['IS_PROCEEDING_TERMINATED'],
+                                        'IS_FIDELITY_BOND_CLAIMED': row['IS_FIDELITY_BOND_CLAIMED'],
+                                        'FIDELITY_BOND_CLAIMED_AMOUNT': row['FIDELITY_BOND_CLAIMED_AMOUNT'],
+                                        'HAS_DIRECTOR_INSURANCE_POLICY': row['HAS_DIRECTOR_INSURANCE_POLICY'],
+                                        'HAS_DIRECTOR_FILED_CLAIM': row['HAS_DIRECTOR_FILED_CLAIM'],
+                                        'FINANCIAL_SUPPORT_2REGISTRANT': row['FINANCIAL_SUPPORT_2REGISTRANT'],
+                                        'IS_EXEMPTIVE_ORDER': row['IS_EXEMPTIVE_ORDER'],
+                                        'IS_UNDERWRITER_HIRED_OR_FIRED': row['IS_UNDERWRITER_HIRED_OR_FIRED'],
+                                        'IS_PUB_ACCOUNTANT_CHANGED': row['IS_PUB_ACCOUNTANT_CHANGED'],
+                                        'IS_MATERIAL_WEAKNESS_NOTED': row['IS_MATERIAL_WEAKNESS_NOTED'],
+                                        'IS_ACCT_OPINION_QUALIFIED': row['IS_ACCT_OPINION_QUALIFIED'],
+                                        'IS_VALUE_METHOD_CHANGED': row['IS_VALUE_METHOD_CHANGED'],
+                                        'IS_ACCT_PRINCIPLE_CHANGED': row['IS_ACCT_PRINCIPLE_CHANGED'],
+                                        'IS_NAV_ERROR_CORRECTED': row['IS_NAV_ERROR_CORRECTED'],
+                                        'ANY_DIVIDEND_PAYMENT': row['ANY_DIVIDEND_PAYMENT']
+                                    }
+                                    all_data[dataset_name].append(registrant_data)
+                                    pbar.update(1)
+                            
+                            elif dataset_name == 'REGISTRANT_WEBSITE':
+                                for index, row in chunk.iterrows():
+                                    website_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'WEBPAGE': row['WEBPAGE']
+                                    }
+                                    all_data[dataset_name].append(website_data)
+                                    pbar.update(1)
+                            
+                            elif dataset_name == 'LOCATION_BOOKS_RECORD':
+                                for index, row in chunk.iterrows():
+                                    books_record_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'OFFICE_NAME': row['OFFICE_NAME'],
+                                        'ADDRESS1': row['ADDRESS1'],
+                                        'ADDRESS2': row['ADDRESS2'],
+                                        'CITY': row['CITY'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'ZIP': row['ZIP'],
+                                        'PHONE': row['PHONE'],
+                                        'BOOKS_RECORDS_DESC': row['BOOKS_RECORDS_DESC']
+                                    }
+                                    all_data[dataset_name].append(books_record_data)
+                                    pbar.update(1)
+                            
+                            elif dataset_name == 'TERMINATED_ORGANIZATION':
+                                for index, row in chunk.iterrows():
+                                    terminated_org_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'SERIES_NAME': row['SERIES_NAME'],
+                                        'SERIES_ID': row['SERIES_ID'],
+                                        'TERMINATION_DATE': row['TERMINATION_DATE']
+                                    }
+                                    all_data[dataset_name].append(terminated_org_data)
+                                    pbar.update(1)
+                            
+                            elif dataset_name == 'DIRECTOR':
+                                for index, row in chunk.iterrows():
+                                    director_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'DIRECTOR_SEQNUM': row['DIRECTOR_SEQNUM'],
+                                        'DIRECTOR_NAME': row['DIRECTOR_NAME'],
+                                        'CRD_NUMBER': row['CRD_NUMBER'],
+                                        'IS_INTERESTED_PERSON': row['IS_INTERESTED_PERSON']
+                                    }
+                                    all_data[dataset_name].append(director_data)
+                                    pbar.update(1)
+                            
+                            elif dataset_name == 'DIRECTOR_FILE_NUMBER':
+                                for index, row in chunk.iterrows():
+                                    director_file_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'DIRECTOR_SEQNUM': row['DIRECTOR_SEQNUM'],
+                                        'FILE_NUMBER': row['FILE_NUMBER']
+                                    }
+                                    all_data[dataset_name].append(director_file_data)
+                                    pbar.update(1)
+                            
+                            elif dataset_name == 'CHIEF_COMPLIANCE_OFFICER':
+                                for index, row in chunk.iterrows():
+                                    cco_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'CCO_SEQNUM': row['CCO_SEQNUM'],
+                                        'CCO_NAME': row['CCO_NAME'],
+                                        'CRD_NUMBER': row['CRD_NUMBER'],
+                                        'CCO_ADDRESS1': row['CCO_ADDRESS1'],
+                                        'CCO_ADDRESS2': row['CCO_ADDRESS2'],
+                                        'CCO_CITY': row['CCO_CITY'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'CCO_ZIP': row['CCO_ZIP'],
+                                        'IS_CHANGED_SINCE_LAST_FILING': row['IS_CHANGED_SINCE_LAST_FILING']
+                                    }
+                                    all_data[dataset_name].append(cco_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'CCO_EMPLOYER':
+                                for index, row in chunk.iterrows():
+                                    cco_employer_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'CCO_SEQNUM': row['CCO_SEQNUM'],
+                                        'CCO_EMPLOYER_NAME': row['CCO_EMPLOYER_NAME'],
+                                        'CCO_EMPLOYER_ID': row['CCO_EMPLOYER_ID']
+                                    }
+                                    all_data[dataset_name].append(cco_employer_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'REGISTRANT_REPORTING_SERIES':
+                                for index, row in chunk.iterrows():
+                                    series_report_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'SOURCE': row['SOURCE'],
+                                        'SERIES_NAME': row['SERIES_NAME'],
+                                        'SERIES_ID': row['SERIES_ID']
+                                    }
+                                    all_data[dataset_name].append(series_report_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'RELEASE_NUMBER':
+                                for index, row in chunk.iterrows():
+                                    release_number_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'RELEASE_NUMBER': row['RELEASE_NUMBER']
+                                    }
+                                    all_data[dataset_name].append(release_number_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'PRINCIPAL_UNDERWRITER':
+                                for index, row in chunk.iterrows():
+                                    underwriter_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'UNDERWRITER_NAME': row['UNDERWRITER_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'CRD_NUM': row['CRD_NUM'],
+                                        'UNDERWRITER_LEI': row['UNDERWRITER_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED']
+                                    }
+                                    all_data[dataset_name].append(underwriter_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'PUBLIC_ACCOUNTANT':
+                                for index, row in chunk.iterrows():
+                                    accountant_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'PUB_ACCOUNTANT_NAME': row['PUB_ACCOUNTANT_NAME'],
+                                        'PCAOB_NUM': row['PCAOB_NUM'],
+                                        'PUB_ACCOUNTANT_LEI': row['PUB_ACCOUNTANT_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY']
+                                    }
+                                    all_data[dataset_name].append(accountant_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'VALUATION_METHOD_CHANGE':
+                                for index, row in chunk.iterrows():
+                                    valuation_change_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'VALUATION_METHOD_CHANGE_SEQNUM': row['VALUATION_METHOD_CHANGE_SEQNUM'],
+                                        'DATE_OF_CHANGE': row['DATE_OF_CHANGE'],
+                                        'CHANGE_EXPLANATION': row['CHANGE_EXPLANATION'],
+                                        'ASSET_TYPE': row['ASSET_TYPE'],
+                                        'ASSET_TYPE_OTHER_DESC': row['ASSET_TYPE_OTHER_DESC'],
+                                        'INVESTMENT_TYPE': row['INVESTMENT_TYPE'],
+                                        'STATUTORY_REGULATORY_BASIS': row['STATUTORY_REGULATORY_BASIS']
+                                    }
+                                    all_data[dataset_name].append(valuation_change_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'VALUATION_METHOD_CHANGE_SERIES':
+                                for index, row in chunk.iterrows():
+                                    valuation_series_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'VALUATION_METHOD_CHANGE_SEQNUM': row['VALUATION_METHOD_CHANGE_SEQNUM'],
+                                        'SERIES_NAME': row['SERIES_NAME'],
+                                        'SERIES_ID': row['SERIES_ID']
+                                    }
+                                    all_data[dataset_name].append(valuation_series_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'FUND_REPORTED_INFO':
+                                for index, row in chunk.iterrows():
+                                    fund_info_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'FUND_NAME': row['FUND_NAME'],
+                                        'SERIES_ID': row['SERIES_ID'],
+                                        'LEI': row['LEI'],
+                                        'IS_FIRST_FILING': row['IS_FIRST_FILING'],
+                                        'AUTHORIZED_SHARES_CNT': row['AUTHORIZED_SHARES_CNT'],
+                                        'ADDED_NEW_SHARES_CNT': row['ADDED_NEW_SHARES_CNT'],
+                                        'TERMINATED_SHARES_CNT': row['TERMINATED_SHARES_CNT'],
+                                        'IS_ETF': row['IS_ETF'],
+                                        'IS_ETMF': row['IS_ETMF'],
+                                        'IS_INDEX': row['IS_INDEX'],
+                                        'IS_MULTI_INVERSE_INDEX': row['IS_MULTI_INVERSE_INDEX'],
+                                        'IS_INTERVAL': row['IS_INTERVAL'],
+                                        'IS_FUND_OF_FUND': row['IS_FUND_OF_FUND'],
+                                        'IS_MASTER_FEEDER': row['IS_MASTER_FEEDER'],
+                                        'IS_MONEY_MARKET': row['IS_MONEY_MARKET'],
+                                        'IS_TARGET_DATE': row['IS_TARGET_DATE'],
+                                        'IS_UNDERLYING_FUND': row['IS_UNDERLYING_FUND'],
+                                        'IS_FUND_TYPE_NA': row['IS_FUND_TYPE_NA'],
+                                        'IS_INDEX_AFFILIATED': row['IS_INDEX_AFFILIATED'],
+                                        'IS_INDEX_EXCLUSIVE': row['IS_INDEX_EXCLUSIVE'],
+                                        'RETURN_B4_FEES_AND_EXPENSES': row['RETURN_B4_FEES_AND_EXPENSES'],
+                                        'RETURN_AFTR_FEES_AND_EXPENSES': row['RETURN_AFTR_FEES_AND_EXPENSES'],
+                                        'STDV_B4_FEES_AND_EXPENSES': row['STDV_B4_FEES_AND_EXPENSES'],
+                                        'STDV_AFTR_FEES_AND_EXPENSES': row['STDV_AFTR_FEES_AND_EXPENSES'],
+                                        'IS_NON_DIVERSIFIED': row['IS_NON_DIVERSIFIED'],
+                                        'IS_FOREIGN_SUBSIDIARY': row['IS_FOREIGN_SUBSIDIARY'],
+                                        'IS_SEC_LENDING_AUTHORIZED': row['IS_SEC_LENDING_AUTHORIZED'],
+                                        'DID_LEND_SECURITIES': row['DID_LEND_SECURITIES'],
+                                        'IS_COLLATERAL_LIQUIDATED': row['IS_COLLATERAL_LIQUIDATED'],
+                                        'IS_IMPACTED_ADVERSELY': row['IS_IMPACTED_ADVERSELY'],
+                                        'IS_PYMNT_REV_SHARING_SPLIT': row['IS_PYMNT_REV_SHARING_SPLIT'],
+                                        'IS_PYMNT_NON_REV_SHARING_SPLIT': row['IS_PYMNT_NON_REV_SHARING_SPLIT'],
+                                        'IS_PYMNT_ADMIN_FEE': row['IS_PYMNT_ADMIN_FEE'],
+                                        'IS_PYMNT_CASH_COLLATERAL_FEE': row['IS_PYMNT_CASH_COLLATERAL_FEE'],
+                                        'IS_PYMNT_INDEMNI_FEE': row['IS_PYMNT_INDEMNI_FEE'],
+                                        'IS_PYMNT_OTHER': row['IS_PYMNT_OTHER'],
+                                        'IS_PYMNT_NA': row['IS_PYMNT_NA'],
+                                        'OTHER_FEE_DESC': row['OTHER_FEE_DESC'],
+                                        'AVG_VALUE_SEC_LOAN': row['AVG_VALUE_SEC_LOAN'],
+                                        'NET_INCOME_SEC_LENDING': row['NET_INCOME_SEC_LENDING'],
+                                        'IS_RELYON_RULE_10F_3': row['IS_RELYON_RULE_10F_3'],
+                                        'IS_RELYON_RULE_12D1_1': row['IS_RELYON_RULE_12D1_1'],
+                                        'IS_RELYON_RULE_15A_4': row['IS_RELYON_RULE_15A_4'],
+                                        'IS_RELYON_RULE_17A_6': row['IS_RELYON_RULE_17A_6'],
+                                        'IS_RELYON_RULE_17A_7': row['IS_RELYON_RULE_17A_7'],
+                                        'IS_RELYON_RULE_17A_8': row['IS_RELYON_RULE_17A_8'],
+                                        'IS_RELYON_RULE_17E_1': row['IS_RELYON_RULE_17E_1'],
+                                        'IS_RELYON_RULE_22D_1': row['IS_RELYON_RULE_22D_1'],
+                                        'IS_RELYON_RULE_23C_1': row['IS_RELYON_RULE_23C_1'],
+                                        'IS_RELYON_RULE_32A_4': row['IS_RELYON_RULE_32A_4'],
+                                        'IS_RELYON_RULE_6C_11': row['IS_RELYON_RULE_6C_11'],
+                                        'IS_RELYON_RULE_12D1_4': row['IS_RELYON_RULE_12D1_4'],
+                                        'IS_RELYON_RULE_12D1G': row['IS_RELYON_RULE_12D1G'],
+                                        'IS_RELYON_RULE_18F_4': row['IS_RELYON_RULE_18F_4'],
+                                        'IS_RELYON_RULE_18F_4C4': row['IS_RELYON_RULE_18F_4C4'],
+                                        'IS_RELYON_RULE_18F_4C2': row['IS_RELYON_RULE_18F_4C2'],
+                                        'IS_RELYON_RULE_18F_4DI': row['IS_RELYON_RULE_18F_4DI'],
+                                        'IS_RELYON_RULE_18F_4DII': row['IS_RELYON_RULE_18F_4DII'],
+                                        'IS_RELYON_RULE_18F_4E': row['IS_RELYON_RULE_18F_4E'],
+                                        'IS_RELYON_RULE_18F_4F': row['IS_RELYON_RULE_18F_4F'],
+                                        'IS_RELYON_RULE_NA': row['IS_RELYON_RULE_NA'],
+                                        'HAS_EXP_LIMIT': row['HAS_EXP_LIMIT'],
+                                        'HAS_EXP_REDUCED_WAIVED': row['HAS_EXP_REDUCED_WAIVED'],
+                                        'HAS_EXP_SUBJ_RECOUP': row['HAS_EXP_SUBJ_RECOUP'],
+                                        'HAS_EXP_RECOUPED': row['HAS_EXP_RECOUPED'],
+                                        'HAS_XAGENT_HIRED_FIRED_MI': row['HAS_XAGENT_HIRED_FIRED_MI'],
+                                        'HAS_PRICING_SRVC_HIRED_FIRED': row['HAS_PRICING_SRVC_HIRED_FIRED'],
+                                        'HAS_CUSTODIAN_HIRED_FIRED_MI': row['HAS_CUSTODIAN_HIRED_FIRED_MI'],
+                                        'HAS_SH_SRVC_HIRED_FIRED': row['HAS_SH_SRVC_HIRED_FIRED'],
+                                        'HAS_ADMIN_HIRED_FIRED': row['HAS_ADMIN_HIRED_FIRED'],
+                                        'AGG_COMMISSION': row['AGG_COMMISSION'],
+                                        'AGG_PRINCIPAL': row['AGG_PRINCIPAL'],
+                                        'DID_PAY_BROKER_RESEARCH': row['DID_PAY_BROKER_RESEARCH'],
+                                        'MONTHLY_AVG_NET_ASSETS': row['MONTHLY_AVG_NET_ASSETS'],
+                                        'DAILY_AVG_NET_ASSETS': row['DAILY_AVG_NET_ASSETS'],
+                                        'HAS_LINE_OF_CREDIT': row['HAS_LINE_OF_CREDIT'],
+                                        'HAS_INTERFUND_LENDING': row['HAS_INTERFUND_LENDING'],
+                                        'HAS_INTERFUND_BORROWING': row['HAS_INTERFUND_BORROWING'],
+                                        'HAS_SWING_PRICING': row['HAS_SWING_PRICING'],
+                                        'SWING_FACTOR_UPPER_LIMIT': row['SWING_FACTOR_UPPER_LIMIT'],
+                                        'DID_MAKE_RIGHTS_OFFERING': row['DID_MAKE_RIGHTS_OFFERING'],
+                                        'DID_MAKE_SECOND_OFFERING': row['DID_MAKE_SECOND_OFFERING'],
+                                        'IS_SECONDARY_COMMON': row['IS_SECONDARY_COMMON'],
+                                        'IS_SECONDARY_PREFERRED': row['IS_SECONDARY_PREFERRED'],
+                                        'IS_SECONDARY_WARRANTS': row['IS_SECONDARY_WARRANTS'],
+                                        'IS_SECONDARY_CONVERTIBLES': row['IS_SECONDARY_CONVERTIBLES'],
+                                        'IS_SECONDARY_BONDS': row['IS_SECONDARY_BONDS'],
+                                        'IS_SECONDARY_OTHER': row['IS_SECONDARY_OTHER'],
+                                        'OTHER_SECONDARY_DESC': row['OTHER_SECONDARY_DESC'],
+                                        'DID_REPURCHASE_SECURITY': row['DID_REPURCHASE_SECURITY'],
+                                        'IS_REPUR_COMMON': row['IS_REPUR_COMMON'],
+                                        'IS_REPUR_PREFERRED': row['IS_REPUR_PREFERRED'],
+                                        'IS_REPUR_WARRANTS': row['IS_REPUR_WARRANTS'],
+                                        'IS_REPUR_CONVERTIBLES': row['IS_REPUR_CONVERTIBLES'],
+                                        'IS_REPUR_BONDS': row['IS_REPUR_BONDS'],
+                                        'IS_REPUR_OTHER': row['IS_REPUR_OTHER'],
+                                        'OTHER_REPUR_DESC': row['OTHER_REPUR_DESC'],
+                                        'IS_LONG_TERM_DEBT_DEFAULT': row['IS_LONG_TERM_DEBT_DEFAULT'],
+                                        'IS_ACCUM_DIVIDEND_IN_ARREARS': row['IS_ACCUM_DIVIDEND_IN_ARREARS'],
+                                        'IS_SECURITY_MAT_MODIFIED': row['IS_SECURITY_MAT_MODIFIED'],
+                                        'MANAGEMENT_FEE': row['MANAGEMENT_FEE'],
+                                        'NET_OPERATING_EXPENSES': row['NET_OPERATING_EXPENSES'],
+                                        'MARKET_PRICE_PER_SHARE': row['MARKET_PRICE_PER_SHARE'],
+                                        'NAV_PER_SHARE': row['NAV_PER_SHARE'],
+                                        'HAS_XAGENT_HIRED_FIRED_CE': row['HAS_XAGENT_HIRED_FIRED_CE'],
+                                        'HAS_CUSTODIAN_HIRED_FIRED_CE': row['HAS_CUSTODIAN_HIRED_FIRED_CE']
+                                    }
+                                    all_data[dataset_name].append(fund_info_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'SHARES_OUTSTANDING':
+                                for index, row in chunk.iterrows():
+                                    shares_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'CLASS_NAME': row['CLASS_NAME'],
+                                        'CLASS_ID': row['CLASS_ID'],
+                                        'TICKER': row['TICKER']
+                                    }
+                                    all_data[dataset_name].append(shares_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'FEEDER_FUNDS':
+                                for index, row in chunk.iterrows():
+                                    feeder_fund_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'FUND_NAME': row['FUND_NAME'],
+                                        'REGISTERED_FILE_NUM': row['REGISTERED_FILE_NUM'],
+                                        'REGISTERED_SERIES_ID': row['REGISTERED_SERIES_ID'],
+                                        'REGISTERED_FUND_LEI': row['REGISTERED_FUND_LEI'],
+                                        'UNREGISTERED_FILE_NUM': row['UNREGISTERED_FILE_NUM'],
+                                        'UNREGISTERED_FUND_LEI': row['UNREGISTERED_FUND_LEI']
+                                    }
+                                    all_data[dataset_name].append(feeder_fund_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'MASTER_FUNDS':
+                                for index, row in chunk.iterrows():
+                                    master_fund_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'FUND_NAME': row['FUND_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'SEC_FILE_NUM': row['SEC_FILE_NUM'],
+                                        'FUND_LEI': row['FUND_LEI']
+                                    }
+                                    all_data[dataset_name].append(master_fund_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'FOREIGN_INVESTMENT':
+                                for index, row in chunk.iterrows():
+                                    foreign_investment_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'FOREIGN_SUBSIDIARY_NAME': row['FOREIGN_SUBSIDIARY_NAME'],
+                                        'FOREIGN_SUBSIDIARY_LEI': row['FOREIGN_SUBSIDIARY_LEI']
+                                    }
+                                    all_data[dataset_name].append(foreign_investment_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'SECURITY_LENDING':
+                                for index, row in chunk.iterrows():
+                                    security_lending_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'SECURITY_LENDING_SEQNUM': row['SECURITY_LENDING_SEQNUM'],
+                                        'SECURITIES_AGENT_NAME': row['SECURITIES_AGENT_NAME'],
+                                        'SECURITIES_AGENT_LEI': row['SECURITIES_AGENT_LEI'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED'],
+                                        'SECURITY_AGENT_IDEMNITY': row['SECURITY_AGENT_IDEMNITY'],
+                                        'DID_INDEMNIFICATION_RIGHTS': row['DID_INDEMNIFICATION_RIGHTS']
+                                    }
+                                    all_data[dataset_name].append(security_lending_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'SEC_LENDING_INDEMNITY_PROVIDER':
+                                for index, row in chunk.iterrows():
+                                    indemnity_provider_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'SECURITY_LENDING_SEQNUM': row['SECURITY_LENDING_SEQNUM'],
+                                        'INDEMNITY_PROVIDER_NAME': row['INDEMNITY_PROVIDER_NAME'],
+                                        'INDEMNITY_PROVIDER_LEI': row['INDEMNITY_PROVIDER_LEI']
+                                    }
+                                    all_data[dataset_name].append(indemnity_provider_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'COLLATERAL_MANAGER':
+                                for index, row in chunk.iterrows():
+                                    collateral_manager_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'COLLATERAL_MANAGER_NAME': row['COLLATERAL_MANAGER_NAME'],
+                                        'COLLATERAL_MANAGER_LEI': row['COLLATERAL_MANAGER_LEI'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED'],
+                                        'IS_AFFILIATED_WITH_FUND': row['IS_AFFILIATED_WITH_FUND']
+                                    }
+                                    all_data[dataset_name].append(collateral_manager_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'ADVISER':
+                                for index, row in chunk.iterrows():
+                                    adviser_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'SOURCE': row['SOURCE'],
+                                        'ADVISER_TYPE': row['ADVISER_TYPE'],
+                                        'ADVISER_NAME': row['ADVISER_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'CRD_NUM': row['CRD_NUM'],
+                                        'ADVISER_LEI': row['ADVISER_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED'],
+                                        'IS_ADVISOR_HIRED': row['IS_ADVISOR_HIRED'],
+                                        'ADVISOR_START_DATE': row['ADVISOR_START_DATE'],
+                                        'ADVISOR_TERMINATED_DATE': row['ADVISOR_TERMINATED_DATE']
+                                    }
+                                    all_data[dataset_name].append(adviser_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'TRANSFER_AGENT':
+                                for index, row in chunk.iterrows():
+                                    transfer_agent_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'SOURCE': row['SOURCE'],
+                                        'TRANSFERAGENT_NAME': row['TRANSFERAGENT_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'TRANSFERAGENT_LEI': row['TRANSFERAGENT_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED'],
+                                        'IS_SUBTRANSFER_AGENT': row['IS_SUBTRANSFER_AGENT']
+                                    }
+                                    all_data[dataset_name].append(transfer_agent_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'PRICING_SERVICE':
+                                for index, row in chunk.iterrows():
+                                    pricing_service_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'PRICING_SERVICE_NAME': row['PRICING_SERVICE_NAME'],
+                                        'PRICING_SERVICE_LEI': row['PRICING_SERVICE_LEI'],
+                                        'OTHER_IDENTIFYING_NUM_DESC': row['OTHER_IDENTIFYING_NUM_DESC'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED']
+                                    }
+                                    all_data[dataset_name].append(pricing_service_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'CUSTODIAN':
+                                for index, row in chunk.iterrows():
+                                    custodian_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'SOURCE': row['SOURCE'],
+                                        'CUSTODIAN_NAME': row['CUSTODIAN_NAME'],
+                                        'CUSTODIAN_LEI': row['CUSTODIAN_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED'],
+                                        'IS_SUB_CUSTODIAN': row['IS_SUB_CUSTODIAN'],
+                                        'CUSTODY_TYPE': row['CUSTODY_TYPE'],
+                                        'OTHER_CUSTODIAN_DESC': row['OTHER_CUSTODIAN_DESC']
+                                    }
+                                    all_data[dataset_name].append(custodian_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'SHAREHOLDER_SERVICING_AGENT':
+                                for index, row in chunk.iterrows():
+                                    servicing_agent_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'AGENT_NAME': row['AGENT_NAME'],
+                                        'AGENT_LEI': row['AGENT_LEI'],
+                                        'OTHER_IDENTIFYING_NUM_DESC': row['OTHER_IDENTIFYING_NUM_DESC'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED'],
+                                        'IS_SUBSHARE': row['IS_SUBSHARE']
+                                    }
+                                    all_data[dataset_name].append(servicing_agent_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'ADMIN':
+                                for index, row in chunk.iterrows():
+                                    admin_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'ADMIN_NAME': row['ADMIN_NAME'],
+                                        'ADMIN_LEI': row['ADMIN_LEI'],
+                                        'OTHER_IDENTIFYING_NUM': row['OTHER_IDENTIFYING_NUM'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED'],
+                                        'IS_SUB_ADMIN': row['IS_SUB_ADMIN']
+                                    }
+                                    all_data[dataset_name].append(admin_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'BROKER_DEALER':
+                                for index, row in chunk.iterrows():
+                                    broker_dealer_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'BROKER_DEALER_NAME': row['BROKER_DEALER_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'CRD_NUM': row['CRD_NUM'],
+                                        'BROKER_DEALER_LEI': row['BROKER_DEALER_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'COMMISSION': row['COMMISSION']
+                                    }
+                                    all_data[dataset_name].append(broker_dealer_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'BROKER':
+                                for index, row in chunk.iterrows():
+                                    broker_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'BROKER_NAME': row['BROKER_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'CRD_NUM': row['CRD_NUM'],
+                                        'BROKER_LEI': row['BROKER_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'GROSS_COMMISSION': row['GROSS_COMMISSION']
+                                    }
+                                    all_data[dataset_name].append(broker_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'PRINCIPAL_TRANSACTION':
+                                for index, row in chunk.iterrows():
+                                    principal_transaction_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'PRINCIPAL_NAME': row['PRINCIPAL_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'CRD_NUM': row['CRD_NUM'],
+                                        'PRINCIPAL_LEI': row['PRINCIPAL_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'PRINCIPAL_TOTAL_PURCHASE_SALE': row['PRINCIPAL_TOTAL_PURCHASE_SALE']
+                                    }
+                                    all_data[dataset_name].append(principal_transaction_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'LINE_OF_CREDIT_DETAIL':
+                                for index, row in chunk.iterrows():
+                                    credit_detail_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'LINE_OF_CREDIT_SEQNUM': row['LINE_OF_CREDIT_SEQNUM'],
+                                        'IS_CREDIT_LINE_COMMITTED': row['IS_CREDIT_LINE_COMMITTED'],
+                                        'LINE_OF_CREDIT_SIZE': row['LINE_OF_CREDIT_SIZE'],
+                                        'CREDIT_TYPE': row['CREDIT_TYPE'],
+                                        'IS_CREDIT_LINE_USED': row['IS_CREDIT_LINE_USED'],
+                                        'AVERAGE_CREDIT_LINE_USED': row['AVERAGE_CREDIT_LINE_USED'],
+                                        'DAYS_CREDIT_USED': row['DAYS_CREDIT_USED']
+                                    }
+                                    all_data[dataset_name].append(credit_detail_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'LINE_OF_CREDIT_INSTITUTION':
+                                for index, row in chunk.iterrows():
+                                    credit_institution_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'LINE_OF_CREDIT_SEQNUM': row['LINE_OF_CREDIT_SEQNUM'],
+                                        'CREDIT_INSTITUTION_NAME': row['CREDIT_INSTITUTION_NAME']
+                                    }
+                                    all_data[dataset_name].append(credit_institution_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'CREDIT_USER':
+                                for index, row in chunk.iterrows():
+                                    credit_user_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'LINE_OF_CREDIT_SEQNUM': row['LINE_OF_CREDIT_SEQNUM'],
+                                        'FUND_NAME': row['FUND_NAME'],
+                                        'SEC_FILE_NUM': row['SEC_FILE_NUM']
+                                    }
+                                    all_data[dataset_name].append(credit_user_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'INTER_FUND_LENDING_DETAIL':
+                                for index, row in chunk.iterrows():
+                                    lending_detail_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'LENDING_LOAN_AVERAGE': row['LENDING_LOAN_AVERAGE'],
+                                        'LENDING_DAYS_OUTSTANDING': row['LENDING_DAYS_OUTSTANDING']
+                                    }
+                                    all_data[dataset_name].append(lending_detail_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'INTER_FUND_BORROWING_DETAIL':
+                                for index, row in chunk.iterrows():
+                                    borrowing_detail_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'BORROWING_LOAN_AVERAGE': row['BORROWING_LOAN_AVERAGE'],
+                                        'BORROWING_DAYS_OUTSTANDING': row['BORROWING_DAYS_OUTSTANDING']
+                                    }
+                                    all_data[dataset_name].append(borrowing_detail_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'SECURITY_RELATED_ITEM':
+                                for index, row in chunk.iterrows():
+                                    security_item_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'SECURITY_RELATED_ITEM_SEQNUM': row['SECURITY_RELATED_ITEM_SEQNUM'],
+                                        'DESCRIPTION': row['DESCRIPTION'],
+                                        'SECURITY_CLASS_TITLE': row['SECURITY_CLASS_TITLE'],
+                                        'OTHER_SECURITY_DESCRIPTION': row['OTHER_SECURITY_DESCRIPTION'],
+                                        'EXCHANGE': row['EXCHANGE'],
+                                        'TICKER_SYMBOL': row['TICKER_SYMBOL']
+                                    }
+                                    all_data[dataset_name].append(security_item_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'RIGHTS_OFFERING_FUND':
+                                for index, row in chunk.iterrows():
+                                    rights_offering_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'IS_RIGHTS_OFFER_COMMON': row['IS_RIGHTS_OFFER_COMMON'],
+                                        'IS_RIGHTS_OFFER_PREFERRED': row['IS_RIGHTS_OFFER_PREFERRED'],
+                                        'IS_RIGHTS_OFFER_WARRANTS': row['IS_RIGHTS_OFFER_WARRANTS'],
+                                        'IS_RIGHTS_OFFER_CONVERTIBLES': row['IS_RIGHTS_OFFER_CONVERTIBLES'],
+                                        'IS_RIGHTS_OFFER_BONDS': row['IS_RIGHTS_OFFER_BONDS'],
+                                        'IS_RIGHTS_OFFER_OTHER': row['IS_RIGHTS_OFFER_OTHER'],
+                                        'RIGHTS_OFFER_DESC': row['RIGHTS_OFFER_DESC'],
+                                        'PCT_PARTCI_PRIMARY_OFFERING': row['PCT_PARTCI_PRIMARY_OFFERING']
+                                    }
+                                    all_data[dataset_name].append(rights_offering_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'LONGTERM_DEBT_DEFAULT':
+                                for index, row in chunk.iterrows():
+                                    debt_default_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'DEFAULT_NATURE': row['DEFAULT_NATURE'],
+                                        'DEFAULT_DATE': row['DEFAULT_DATE'],
+                                        'DEFAULT_AMNT_PER_1000': row['DEFAULT_AMNT_PER_1000'],
+                                        'TOTAL_DEFAULT_AMNT': row['TOTAL_DEFAULT_AMNT']
+                                    }
+                                    all_data[dataset_name].append(debt_default_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'DIVIDENDS_IN_ARREAR':
+                                for index, row in chunk.iterrows():
+                                    dividends_arrear_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'ISSUE_TITLE': row['ISSUE_TITLE'],
+                                        'AMOUNT_PER_SHARE_IN_ARREAR': row['AMOUNT_PER_SHARE_IN_ARREAR']
+                                    }
+                                    all_data[dataset_name].append(dividends_arrear_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'SECURITY_EXCHANGE':
+                                for index, row in chunk.iterrows():
+                                    exchange_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'FUND_EXCHANGE': row['FUND_EXCHANGE'],
+                                        'FUND_TICKER_SYMBOL': row['FUND_TICKER_SYMBOL']
+                                    }
+                                    all_data[dataset_name].append(exchange_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'AUTHORIZED_PARTICIPANT':
+                                for index, row in chunk.iterrows():
+                                    participant_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'PARTICIPANT_NAME': row['PARTICIPANT_NAME'],
+                                        'FILE_NUM': row['FILE_NUM'],
+                                        'CRD_NUM': row['CRD_NUM'],
+                                        'PARTICIPANT_LEI': row['PARTICIPANT_LEI'],
+                                        'PURCHASE_VALUE': row['PURCHASE_VALUE'],
+                                        'REDEEM_VALUE': row['REDEEM_VALUE']
+                                    }
+                                    all_data[dataset_name].append(participant_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'ETF':
+                                for index, row in chunk.iterrows():
+                                    etf_data = {
+                                        'FUND_ID': row['FUND_ID'],
+                                        'FUND_NAME': row['FUND_NAME'],
+                                        'SERIES_ID': row['SERIES_ID'],
+                                        'IS_COLLATERAL_REQUIRED': row['IS_COLLATERAL_REQUIRED'],
+                                        'NUM_SHARES_PER_CREATION_UNIT': row['NUM_SHARES_PER_CREATION_UNIT'],
+                                        'PURCHASED_AVG_PCT_CASH': row['PURCHASED_AVG_PCT_CASH'],
+                                        'PURCHASED_STDV_PCT_CASH': row['PURCHASED_STDV_PCT_CASH'],
+                                        'PURCHASED_AVG_PCT_NON_CASH': row['PURCHASED_AVG_PCT_NON_CASH'],
+                                        'PURCHASED_STDV_PCT_NON_CASH': row['PURCHASED_STDV_PCT_NON_CASH'],
+                                        'REDEEMED_AVG_PCT_CASH': row['REDEEMED_AVG_PCT_CASH'],
+                                        'REDEEMED_STDV_PCT_CASH': row['REDEEMED_STDV_PCT_CASH'],
+                                        'REDEEMED_AVG_PCT_NON_CASH': row['REDEEMED_AVG_PCT_NON_CASH'],
+                                        'REDEEMED_STDV_PCT_NON_CASH': row['REDEEMED_STDV_PCT_NON_CASH'],
+                                        'PURCH_AVG_FEE_PER_UNIT': row['PURCH_AVG_FEE_PER_UNIT'],
+                                        'PURCH_AVG_FEE_SAME_DAY': row['PURCH_AVG_FEE_SAME_DAY'],
+                                        'PURCH_AVG_FEE_PERCENTAGE': row['PURCH_AVG_FEE_PERCENTAGE'],
+                                        'PURCH_AVG_FEE_CASH_PER_UNIT': row['PURCH_AVG_FEE_CASH_PER_UNIT'],
+                                        'PURCH_AVG_FEE_CASH_SAME_DAY': row['PURCH_AVG_FEE_CASH_SAME_DAY'],
+                                        'PURCH_AVG_FEE_CASH_PERCENTAGE': row['PURCH_AVG_FEE_CASH_PERCENTAGE'],
+                                        'REDEEM_AVG_FEE_PER_UNIT': row['REDEEM_AVG_FEE_PER_UNIT'],
+                                        'REDEEM_AVG_FEE_SAME_DAY': row['REDEEM_AVG_FEE_SAME_DAY'],
+                                        'REDEEM_AVG_FEE_PERCENTAGE': row['REDEEM_AVG_FEE_PERCENTAGE'],
+                                        'REDEEM_AVG_FEE_CASH_PER_UNIT': row['REDEEM_AVG_FEE_CASH_PER_UNIT'],
+                                        'REDEEM_AVG_FEE_CASH_SAME_DAY': row['REDEEM_AVG_FEE_CASH_SAME_DAY'],
+                                        'REDEEM_AVG_FEE_CASH_PERCENTAGE': row['REDEEM_AVG_FEE_CASH_PERCENTAGE'],
+                                        'IS_PERF_TRACKED_AFFILIA_PERSON': row['IS_PERF_TRACKED_AFFILIA_PERSON'],
+                                        'IS_PERF_TRACKED_EXCLUSIVELY': row['IS_PERF_TRACKED_EXCLUSIVELY'],
+                                        'ANNUAL_DIFF_B4_FEE_EXPENSE': row['ANNUAL_DIFF_B4_FEE_EXPENSE'],
+                                        'ANNUAL_DIFF_AFTER_FEE_EXPENSE': row['ANNUAL_DIFF_AFTER_FEE_EXPENSE'],
+                                        'ANNUAL_STDV_B4_FEE_EXPENSE': row['ANNUAL_STDV_B4_FEE_EXPENSE'],
+                                        'ANNUAL_STDV_AFTER_FEE_EXPENSE': row['ANNUAL_STDV_AFTER_FEE_EXPENSE'],
+                                        'IS_FUND_IN_KIND_ETF': row['IS_FUND_IN_KIND_ETF']
+                                    }
+                                    all_data[dataset_name].append(etf_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'DEPOSITOR':
+                                for index, row in chunk.iterrows():
+                                    depositor_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'DEPOSITOR_NAME': row['DEPOSITOR_NAME'],
+                                        'CRD_NUM': row['CRD_NUM'],
+                                        'DEPOSITOR_LEI': row['DEPOSITOR_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'ULTIMATE_PARENT_NAME': row['ULTIMATE_PARENT_NAME']
+                                    }
+                                    all_data[dataset_name].append(depositor_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'UIT_ADMIN':
+                                for index, row in chunk.iterrows():
+                                    uit_admin_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'UIT_ADMIN_NAME': row['UIT_ADMIN_NAME'],
+                                        'UIT_ADMIN_LEI': row['UIT_ADMIN_LEI'],
+                                        'OTHER_IDENTIFYING_NUM': row['OTHER_IDENTIFYING_NUM'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY'],
+                                        'IS_AFFILIATED': row['IS_AFFILIATED'],
+                                        'IS_SUB_ADMIN': row['IS_SUB_ADMIN']
+                                    }
+                                    all_data[dataset_name].append(uit_admin_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'UIT':
+                                for index, row in chunk.iterrows():
+                                    uit_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'IS_ADMIN_HIRED_FIRED': row['IS_ADMIN_HIRED_FIRED'],
+                                        'IS_SEPERATE_ACCT': row['IS_SEPERATE_ACCT'],
+                                        'EXISTING_SERIES_CNT': row['EXISTING_SERIES_CNT'],
+                                        'NEW_SERIES_CNT': row['NEW_SERIES_CNT'],
+                                        'NEW_SERIES_AGG_VALUE': row['NEW_SERIES_AGG_VALUE'],
+                                        'SERIES_CURRENT_PROSPECTUS': row['SERIES_CURRENT_PROSPECTUS'],
+                                        'SERIES_CNT_ADDITIONAL_UNITS': row['SERIES_CNT_ADDITIONAL_UNITS'],
+                                        'TOTAL_VALUE_ADDITIONAL_UNIT': row['TOTAL_VALUE_ADDITIONAL_UNIT'],
+                                        'VALUE_UNIT_PLACED_SUBSEQUENT': row['VALUE_UNIT_PLACED_SUBSEQUENT'],
+                                        'TOTAL_ASSET_FOR_ALL_SERIES': row['TOTAL_ASSET_FOR_ALL_SERIES'],
+                                        'SERIES_ID': row['SERIES_ID'],
+                                        'NUM_CONTRACTS': row['NUM_CONTRACTS'],
+                                        'IS_RELYON_RULE_6C_7': row['IS_RELYON_RULE_6C_7'],
+                                        'IS_RELYON_RULE_11A_2': row['IS_RELYON_RULE_11A_2'],
+                                        'IS_RELYON_RULE_12D1_4': row['IS_RELYON_RULE_12D1_4'],
+                                        'IS_RELYON_RULE_12D1G': row['IS_RELYON_RULE_12D1G']
+                                    }
+                                    all_data[dataset_name].append(uit_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'SERIES_CIK':
+                                for index, row in chunk.iterrows():
+                                    series_cik_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'SERIES_CIK': row['SERIES_CIK']
+                                    }
+                                    all_data[dataset_name].append(series_cik_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'SPONSOR':
+                                for index, row in chunk.iterrows():
+                                    sponsor_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'SPONSOR_NAME': row['SPONSOR_NAME'],
+                                        'CRD_NUM': row['CRD_NUM'],
+                                        'SPONSOR_LEI': row['SPONSOR_LEI'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY']
+                                    }
+                                    all_data[dataset_name].append(sponsor_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'TRUSTEE':
+                                for index, row in chunk.iterrows():
+                                    trustee_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'TRUSTEE_NAME': row['TRUSTEE_NAME'],
+                                        'STATE': row['STATE'],
+                                        'COUNTRY': row['COUNTRY']
+                                    }
+                                    all_data[dataset_name].append(trustee_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'CONTRACT_SECURITY':
+                                for index, row in chunk.iterrows():
+                                    contract_security_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'SECURITY_NAME': row['SECURITY_NAME'],
+                                        'CONTRACT_ID': row['CONTRACT_ID'],
+                                        'TOTAL_ASSET': row['TOTAL_ASSET'],
+                                        'NUM_CONTRACT_SOLD': row['NUM_CONTRACT_SOLD'],
+                                        'GROSS_PREMIUM_RECEIVED': row['GROSS_PREMIUM_RECEIVED'],
+                                        'GROSS_PREMIUM_RECEIVED_SEC1035': row['GROSS_PREMIUM_RECEIVED_SEC1035'],
+                                        'NUM_CONTRACT_AFFECTED_PAID': row['NUM_CONTRACT_AFFECTED_PAID'],
+                                        'CONTRACT_VALUE_REDEEMED': row['CONTRACT_VALUE_REDEEMED'],
+                                        'CONTRAC_VALUE_REDEEMED_SEC1035': row['CONTRAC_VALUE_REDEEMED_SEC1035'],
+                                        'NUM_CONTRACT_AFFECTED_REDEEMED': row['NUM_CONTRACT_AFFECTED_REDEEMED']
+                                    }
+                                    all_data[dataset_name].append(contract_security_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'DIVESTMENT':
+                                for index, row in chunk.iterrows():
+                                    divestment_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'ISSUER_NAME': row['ISSUER_NAME'],
+                                        'TICKER': row['TICKER'],
+                                        'CUSIP': row['CUSIP'],
+                                        'DIVESTED_NUM_SHARES': row['DIVESTED_NUM_SHARES'],
+                                        'DIVESTED_DATE': row['DIVESTED_DATE'],
+                                        'STATUTE_NAME': row['STATUTE_NAME']
+                                    }
+                                    all_data[dataset_name].append(divestment_data)
+                                    pbar.update(1)
+
+                            elif dataset_name == 'REGISTRANT_HELDS_SECURITY':
+                                for index, row in chunk.iterrows():
+                                    held_security_data = {
+                                        'ACCESSION_NUMBER': row['ACCESSION_NUMBER'],
+                                        'TICKER': row['TICKER'],
+                                        'CUSIP': row['CUSIP'],
+                                        'TOTAL_NUM_SHARES': row['TOTAL_NUM_SHARES']
+                                    }
+                                    all_data[dataset_name].append(held_security_data)
+                                    pbar.update(1)
+
+                    if verbose:
+                        print(f"Processed {total_rows} rows from {file_name}")
+                elif verbose:
+                    print(f"Warning: {file_name} not found in {zip_file}")
+
+            if debug:
+                for dataset_name in all_data.keys():
+                    if all_data[dataset_name]:
+                        sample = all_data[dataset_name][0]
+                        print(f"Sample data from {dataset_name}: {sample}")
+
+    except Exception as e:
+        if verbose:
+            print(f"Error processing {zip_file}: {str(e)}")
+
+    return dict(all_data)
+def search_ncen(search_keywords, verbose=False, search_ncen_swaps=False):
+    import tqdm, pandas as pd
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    from functools import partial
+    import re
+    import queue
+    import os
+    import gc
+    from multiprocessing import cpu_count
+
+    secncen_path = os.path.join(ROOT_DIR, "SecNcen")
+    os.makedirs(secncen_path, exist_ok=True)
+    
+    # Function to sort zip files from oldest to youngest
+    def sort_key(filename):
+        match = re.match(r'(\d{4})q(\d)_ncen\.zip', filename)
+        if match:
+            year, quarter = int(match.group(1)), int(match.group(2))
+            return year * 4 + quarter  # Convert to a sortable number
+        return 0  # If no match, put at beginning
+
+    zip_files = sorted([os.path.join(secncen_path, f) for f in os.listdir(secncen_path) if f.endswith('.zip')], key=lambda x: sort_key(os.path.basename(x)))
+    
+    search_terms = [term.strip() for term in search_keywords.split(',')]
+    
+    output_file = os.path.join(ROOT_DIR, f"{search_keywords.replace(',', '_')}_summary_results.csv")
+
+    # Queue to hold results
+    result_queue = queue.Queue()
+
+    headers = [
+        'FUND_ID', 'FUND_NAME', 'SERIES_ID', 'FILENAME_TIMESTAMP', 'IS_ETF', 'IS_INDEX', 
+        'IS_FUND_OF_FUND', 'IS_MASTER_FEEDER', 'IS_MONEY_MARKET', 'IS_TARGET_DATE', 
+        'IS_UNDERLYING_FUND', 'YYYYQQ', 'CIK', 'REGISTRANT_NAME', 'FILE_NUM', 'LEI', 
+        'ADDRESS1', 'ADDRESS2', 'CITY', 'STATE', 'COUNTRY', 'ZIP', 'PHONE', 
+        'ADVISER_FUND_ID', 'ADVISER_SOURCE', 'ADVISER_ADVISER_TYPE', 'ADVISER_ADVISER_NAME', 
+        'ADVISER_FILE_NUM', 'ADVISER_CRD_NUM', 'ADVISER_ADVISER_LEI', 'ADVISER_STATE', 
+        'ADVISER_COUNTRY', 'ADVISER_IS_AFFILIATED', 'ADVISER_IS_ADVISOR_HIRED', 
+        'ADVISOR_START_DATE', 'ADVISOR_TERMINATED_DATE'
+    ]
+
+    # Write headers to output file
+    with open(output_file, 'w', newline='') as csvfile:
+        pd.DataFrame(columns=headers).to_csv(csvfile, index=False, header=True, mode='w')
+
+    # Use all available cores for processing
+    available_cores = cpu_count()
+    with ProcessPoolExecutor(max_workers=available_cores) as executor:
+        futures = {executor.submit(process_ncen, zip_file, search_terms, verbose): zip_file for zip_file in zip_files}
+
+        if verbose:
+            with tqdm.tqdm(total=len(zip_files), desc="Files Processed", unit="file") as file_progress:
+                for future in as_completed(futures):
+                    try:
+                        results = future.result()
+                        for date, item in results:
+                            result_queue.put((futures[future], date, item))  # Store file, date, and item
+                    except Exception as e:
+                        if verbose:
+                            print(f"An error occurred while processing {futures[future]}: {str(e)}")
+                    finally:
+                        if verbose:
+                            file_progress.update(1)
+
+                    # Write results to CSV as they become available
+                    while not result_queue.empty():
+                        _, date, item = result_queue.get()
+                        with open(output_file, 'a', newline='') as csvfile:
+                            # Ensure all headers are present or handle missing ones
+                            item = {k: item.get(k, '') for k in headers}
+                            pd.DataFrame([item]).to_csv(csvfile, index=False, header=False, mode='a')
+                        if verbose:
+                            print(f"Wrote item from {date} to CSV")
+
+    gc.collect()  # Memory management
+def process_ncen(zip_file, search_terms, verbose=False):
+    results = []
+    for term in search_terms:
+        summary = search_ncen_data(zip_file, term, verbose)
+        
+        # Convert to datetime if needed
+        for item in summary:
+            date = datetime.fromtimestamp(item['FILENAME_TIMESTAMP']) if 'FILENAME_TIMESTAMP' in item else datetime(1970, 1, 1)
+            results.append((date, item))
+    return results
 def main_search(zip_file, search_keyword, verbose=False, looking_for_swaps=False):
     import tqdm, pandas as pd
     if verbose:
-        print(f"Starting search_for_swaps for {zip_file}")
+        print(f"Starting {zip_file}")
     summary = []
     
     try:
@@ -2657,7 +4105,7 @@ def main_search(zip_file, search_keyword, verbose=False, looking_for_swaps=False
 
                     if search_keyword == 'SWAPS$':
                         # Special case for SWAPS$ to search across all columns
-                        return search_for_swaps(zip_file, verbose, debug=True)
+                        return search_nport_swaps(zip_file, verbose, debug=True)
                     else:
                         # Escape special regex characters in each search term
                         search_terms = [re.escape(term.strip()) for term in search_keyword.split(',')]
@@ -2777,7 +4225,7 @@ def main_search(zip_file, search_keyword, verbose=False, looking_for_swaps=False
                         #if verbose and index % 10 == 0:  # Print status every 10 entries
                         #    print(f"Processed {index} holdings for {zip_file}")
         if verbose:
-            print(f"Finished search_for_swaps for {zip_file}")
+            print(f"Finished {zip_file}")
     except Exception as e:
         if verbose:
             print(f"Error processing {zip_file}: {str(e)}")
@@ -2787,7 +4235,7 @@ def process_file(zip_file, search_terms, verbose=False, looking_for_swaps=False)
     results = []
     for term in search_terms:
         if term == 'SWAPS$':
-            summary, _ = search_for_swaps(zip_file, verbose, debug=True)
+            summary, _ = search_nport_swaps(zip_file, verbose, debug=True)
         else:
             summary = main_search(zip_file, term, verbose, looking_for_swaps)
         
@@ -2817,95 +4265,6 @@ def write_to_csv(queue, output_file, verbose=False):
             except Exception as e:
                 if verbose:
                     print(f"Error writing to CSV: {e}")
-def main(search_keywords, verbose=False, search_for_swaps=False):
-    import tqdm, concurrent.futures, pandas as pd
-    secnports_path = os.path.join(ROOT_DIR, "SecNport")
-    os.makedirs(secnports_path, exist_ok=True)
-    
-    zip_files = [os.path.join(secnports_path, f) for f in os.listdir(secnports_path) if f.endswith('.zip')]
-    zip_files = [os.path.normpath(path) for path in zip_files]
-    search_terms = [term.strip() for term in search_keywords.split(',')]
-    
-    output_file = os.path.join(ROOT_DIR, f"{search_keywords.replace(',', '_')}_summary_results.csv")
-
-    with open(output_file, 'w', newline='') as csvfile:
-        headers = ['ACCESSION_NUMBER', 'HOLDING_ID', 'FILENAME_TIMESTAMP', 'ISSUER_NAME', 'ISSUER_LEI', 
-                   'ISSUER_TITLE', 'ISSUER_CUSIP', 'BALANCE', 'UNIT', 'OTHER_UNIT_DESC', 'CURRENCY_CODE', 
-                   'CURRENCY_VALUE', 'EXCHANGE_RATE', 'PERCENTAGE', 'PAYOFF_PROFILE', 'ASSET_CAT', 
-                   'OTHER_ASSET', 'ISSUER_TYPE', 'OTHER_ISSUER', 'INVESTMENT_COUNTRY', 
-                   'IS_RESTRICTED_SECURITY', 'FAIR_VALUE_LEVEL', 'DERIVATIVE_CAT', 
-                   'CIK', 'REGISTRANT_NAME', 'FILE_NUM', 'LEI', 'ADDRESS1', 'ADDRESS2', 'CITY', 'STATE', 
-                   'COUNTRY', 'ZIP', 'PHONE', 'YYYYQQ']
-        
-        pd.DataFrame(columns=headers).to_csv(csvfile, index=False, header=True, mode='w')
-
-        if verbose:
-            with tqdm.tqdm(total=len(zip_files), desc="Files Processed", unit="file") as file_progress:
-                with ProcessPoolExecutor() as executor:
-                    futures = [executor.submit(process_file, file, search_terms, verbose, search_for_swaps) for file in zip_files]
-
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            results = future.result()
-                            for date, item in results:
-                                df = pd.DataFrame([item])
-                                df.to_csv(csvfile, index=False, header=False, mode='a')
-                                if verbose:
-                                    print(f"Wrote item with date {date} to CSV")
-                        except Exception as e:
-                            if verbose:
-                                print(f"An error occurred while processing a file: {str(e)}")
-                        finally:
-                            if verbose:
-                                file_progress.update(1)
-
-    gc.collect()  # Memory management
-
-    # Commented section for concurrent writing to test:
-    # result_queue = queue.Queue()
-    # 
-    # def write_to_csv(queue, output_file, verbose=False):
-    #     with open(output_file, 'w', newline='') as csvfile:
-    #         writer = pd.DataFrame().to_csv(csvfile, index=False, header=True, mode='w')  # Write header once
-    #         while True:
-    #             try:
-    #                 date, item = queue.get(timeout=1)  # Wait up to 1 second
-    #                 if date is None:  # Sentinel value to signal end of queue
-    #                     break
-    #                 df = pd.DataFrame([item])
-    #                 df.to_csv(csvfile, index=False, header=False, mode='a')
-    #                 if verbose:
-    #                     print(f"Wrote item with date {date} to CSV")
-    #             except queue.Empty:
-    #                 if verbose:
-    #                     print("No more items to write, writer thread exiting.")
-    #                 break
-    #             except Exception as e:
-    #                 if verbose:
-    #                     print(f"Error writing to CSV: {e}")
-    # 
-    # writer_thread = threading.Thread(target=write_to_csv, args=(result_queue, output_file, verbose))
-    # writer_thread.start()
-    # 
-    # with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-    #     future_to_file = {executor.submit(process_file, file, search_terms, verbose, search_for_swaps): file for file in zip_files}
-    #     
-    #     for future in concurrent.futures.as_completed(future_to_file):
-    #         file = future_to_file[future]
-    #         try:
-    #             results = future.result()
-    #             for result in results:
-    #                 result_queue.put(result)
-    #             if verbose:
-    #                 print(f"Finished processing {file}")
-    #         except Exception as e:
-    #             if verbose:
-    #                 print(f"An error occurred while processing {file}: {str(e)}")
-    # 
-    # result_queue.put((None, None))  # Sentinel to signal end of queue
-    # writer_thread.join()
-    # 
-    # gc.collect()  # Memory management
 if __name__ == "__main__":
     check_and_install_modules()
     import_modules()
@@ -2917,8 +4276,11 @@ if __name__ == "__main__":
     print("4: Form D archives")
     print("2: NMFP archives")
     print("0: 13F archives")
-    print("g: Credit Swap archives")
-    print("m: Equity Swap archives")
+    print("g: SEC Credit Swap archives")
+    print("g2: SEC Equity Swap archives")
+    print("m: CFTC Credit Swap archives")
+    print("m2: CFTC Equity Swap archives")
+    print("m3: CFTC Commodity Swap archives")
     print("e: Edgar archives")
     print("r: Exchange volume archives")
     print("i: Insider trading archives")
@@ -2933,7 +4295,7 @@ if __name__ == "__main__":
         search_keyword = input("Enter the keyword to search for (e.g., 'Gamestop'): ").strip() or 'gamestop'
         search_for_swaps = input("Searching for swaps? (s for swaps, enter for other positions): ").lower() == 's'
         verbose = input("Enable verbose mode? (y/n): ").lower() == 'y'
-        main(search_keyword, verbose, search_for_swaps)
+        search_nport(search_keyword, verbose, search_for_swaps)
     elif query == '9':
         download_ncen_archives()
     elif query == '4':
@@ -2944,8 +4306,14 @@ if __name__ == "__main__":
         download_13F_archives()
     elif query == 'g':
         download_credit_archives()
-    elif query == 'm':
+    elif query == 'g2':
         download_equities_archives()
+    elif query == 'm':
+        download_cftc_credit_archives()
+    elif query == 'm2':
+        download_cftc_equities_archives()
+    elif query == 'm3':
+        download_cftc_commodities_archives()
     elif query == 'e':
         # Download Edgar Archives
         download_edgar_archives()
