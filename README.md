@@ -20,6 +20,9 @@ python scripts/gamecock.py --parse-ncen path/to/file.zip
 python scripts/gamecock.py --parse-nport path/to/file.zip
 python scripts/gamecock.py --trace-liabilities XXXXXXXXXXXX
 python scripts/gamecock.py --summarize filing.txt
+python scripts/gamecock.py --parse-cftc path/to/archive.zip
+python scripts/gamecock.py --aggregate-exposures
+python scripts/gamecock.py --exposure-threshold 1000000
 ```
 
 The first run creates a `gamecock.db` SQLite database to track downloaded files. Additional modules and features will be added over time.

@@ -65,6 +65,17 @@ def init_db(db_path: Path = Path(DB_NAME)):
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS cftc_swap (
+            dissemination_id TEXT PRIMARY KEY,
+            lei TEXT,
+            product TEXT,
+            notional_leg1 REAL,
+            notional_leg2 REAL
+        )
+        """
+    )
     conn.commit()
     conn.close()
 
@@ -139,6 +150,31 @@ def record_nport_holding(
     conn.execute(
         "INSERT OR IGNORE INTO nport_holding(lei, issuer, cusip, value, accession) VALUES(?,?,?,?,?)",
         (lei, issuer, cusip, value, accession),
+    )
+    conn.commit()
+    conn.close()
+
+
+def record_cftc_swap(
+    dissemination_id: str,
+    lei: str,
+    product: str,
+    notional_leg1: float,
+    notional_leg2: float,
+    db_path: Path = Path(DB_NAME),
+):
+    conn = get_connection(db_path)
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO cftc_swap(
+            dissemination_id,
+            lei,
+            product,
+            notional_leg1,
+            notional_leg2
+        ) VALUES(?,?,?,?,?)
+        """,
+        (dissemination_id, lei, product, notional_leg1, notional_leg2),
     )
     conn.commit()
     conn.close()
