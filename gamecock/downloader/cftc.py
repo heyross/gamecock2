@@ -22,3 +22,21 @@ class CFTCCreditDownloader(ArchiveDownloader):
             date += timedelta(days=1)
         return urls
 
+
+class CFTCEquityDownloader(CFTCCreditDownloader):
+    """Downloader for the equity swaps dataset."""
+
+    BASE_URL = (
+        "https://kgc0418-tdw-data-0.s3.us-gov-west-1.amazonaws.com/s3fs-public/"
+        "DCIO/DCIOSwapsData/equity/"
+    )
+
+
+class CFTCCommodityDownloader(CFTCCreditDownloader):
+    """Downloader for the commodity swaps dataset."""
+
+    BASE_URL = (
+        "https://kgc0418-tdw-data-0.s3.us-gov-west-1.amazonaws.com/s3fs-public/"
+        "DCIO/DCIOSwapsData/commodity/"
+    )
+
