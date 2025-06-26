@@ -14,3 +14,6 @@
 - Implemented NPORT parser and expanded SQLite schema with LEI mappings and holding tables.
 - Added simple search utility to locate filings by LEI.
 - Extended CLI to expose new download and search functions.
+- Added parsers for NCEN and NPORT filings that populate the database.
+- Implemented liability tracing queries walking CIK/LEI links.
+- Added basic local summarizer for narrative filings and CLI options for parsing and summarization.

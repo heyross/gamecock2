@@ -69,6 +69,24 @@ def init_db(db_path: Path = Path(DB_NAME)):
     conn.close()
 
 
+def record_filing(
+    cik: str,
+    accession: str,
+    form: str,
+    filepath: Path,
+    db_path: Path = Path(DB_NAME),
+):
+    """Record a downloaded filing in the database."""
+    conn = get_connection(db_path)
+    conn.execute(
+        "INSERT OR IGNORE INTO filings(cik, accession, form, filepath, downloaded_at)"
+        " VALUES(?,?,?,?,?)",
+        (cik, accession, form, str(filepath), datetime.utcnow()),
+    )
+    conn.commit()
+    conn.close()
+
+
 def record_file(url: str, path: Path, size: int, db_path: Path = Path(DB_NAME)):
     conn = get_connection(db_path)
     conn.execute(
