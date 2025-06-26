@@ -3,6 +3,8 @@ from pathlib import Path
 from datetime import datetime
 
 from . import database, identifiers, search
+from .parser import ncen as ncen_parser, nport as nport_parser
+from . import summarizer
 from .downloader.cftc import (
     CFTCCreditDownloader,
     CFTCEquityDownloader,
@@ -23,6 +25,10 @@ def main():
     parser.add_argument('--download-commodity', action='store_true', help='Download CFTC commodity archives for last day')
     parser.add_argument('--download-filing', nargs=2, metavar=('CIK', 'ACCESSION'), help='Download a specific EDGAR filing')
     parser.add_argument('--trace-lei', help='Search filings associated with a LEI')
+    parser.add_argument('--parse-ncen', nargs='+', type=Path, help='Parse NCEN filing zip files')
+    parser.add_argument('--parse-nport', nargs='+', type=Path, help='Parse NPORT filing zip files')
+    parser.add_argument('--trace-liabilities', help='Trace liability chain for a LEI')
+    parser.add_argument('--summarize', type=Path, help='Summarize narrative filing text file')
     args = parser.parse_args()
 
     database.init_db()
@@ -54,6 +60,35 @@ def main():
     if args.trace_lei:
         for filing in search.find_filings_by_lei(args.trace_lei):
             print(filing)
+
+    if args.parse_ncen:
+        for path in args.parse_ncen:
+            accession = path.stem
+            for row in ncen_parser.parse(path):
+                cik = (row.get('CIK') or '').lstrip('0')
+                lei = row.get('LEI') or ''
+                name = row.get('FUND_NAME') or row.get('NAME') or ''
+                database.record_ncen_registrant(cik, lei, name, accession)
+
+    if args.parse_nport:
+        for path in args.parse_nport:
+            accession = path.stem
+            for row in nport_parser.parse(path):
+                lei = row.get('LEI') or ''
+                issuer = row.get('ISSUER_NAME') or row.get('ISSUER') or ''
+                cusip = row.get('CUSIP') or ''
+                try:
+                    value = float(str(row.get('VALUE') or '0').replace(',', ''))
+                except ValueError:
+                    value = 0.0
+                database.record_nport_holding(lei, issuer, cusip, value, accession)
+
+    if args.trace_liabilities:
+        for row in search.trace_liability_chain(args.trace_liabilities):
+            print(row)
+
+    if args.summarize:
+        print(summarizer.summarize_file(args.summarize))
 
 
 if __name__ == '__main__':

@@ -16,6 +16,10 @@ Additional options allow downloading equity or commodity swap archives, EDGAR fi
 python scripts/gamecock.py --download-equity
 python scripts/gamecock.py --download-filing 0000320193 0000320193-24-000010
 python scripts/gamecock.py --trace-lei XXXXXXXXXXXX
+python scripts/gamecock.py --parse-ncen path/to/file.zip
+python scripts/gamecock.py --parse-nport path/to/file.zip
+python scripts/gamecock.py --trace-liabilities XXXXXXXXXXXX
+python scripts/gamecock.py --summarize filing.txt
 ```
 
 The first run creates a `gamecock.db` SQLite database to track downloaded files. Additional modules and features will be added over time.
