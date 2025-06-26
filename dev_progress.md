@@ -17,3 +17,4 @@
 - Added parsers for NCEN and NPORT filings that populate the database.
 - Implemented liability tracing queries walking CIK/LEI links.
 - Added basic local summarizer for narrative filings and CLI options for parsing and summarization.
+- Outlined an exposure analysis plan covering data ingestion, normalization, exposure calculation and trigger detection.
