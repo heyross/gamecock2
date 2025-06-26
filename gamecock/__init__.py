@@ -1,0 +1,2 @@
+"""Gamecock package"""
+
