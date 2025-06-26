@@ -1,8 +1,12 @@
 # Agent Notes
 
+## Completed
+- Added downloaders for equity and commodity swaps and individual EDGAR filings.
+- Expanded SQLite schema with LEI mapping and tables for NCEN registrants and NPORT holdings.
+- Implemented basic search utility to find filings by LEI and exposed new CLI options.
+
 ## Next Session
-- Flesh out downloaders for additional datasets (equity and commodity swaps, EDGAR filing downloads).
-- Expand SQLite schema to store parsed records from NCEN/NPORT and link with CIK/LEI mappings.
-- Implement search functions across the stored swaps and filings to trace liability chains.
-- Integrate local LLM summarization for free-form filings to extract derivative information.
+- Parse NCEN and NPORT filings into the new tables.
+- Build queries that walk CIK/LEI links to trace liability chains across datasets.
+- Integrate local LLM summarization of narrative filings to extract derivative details.
 
