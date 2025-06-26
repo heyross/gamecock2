@@ -1,11 +1,14 @@
-# SECthingv2
-this bad boy scrapes every/any type of archive from the SEC in raw form, turning anyone into an archivist.
+# Gamecock
 
-install python 3.12.
-then from command line, simply go to the folder containing the script and type:
-python3 gamecockv1.py
+This project provides tools for downloading and analyzing swap data from CFTC archives and related SEC filings. A small command line interface enables looking up CIKs by ticker symbol and downloading daily swap archives.
 
-it will auto install the required modules, and query for which archives to download.
-almost everythings broken at the moment after that, but, AI is a very powerful tool on how to understand the filings inside the archives.
-explore, poke around in the, and look things up. 
-make learning great again :)
+## Usage
+
+Install Python 3.12 or newer and run:
+
+```bash
+python scripts/gamecock.py TICKER --download-cftc
+```
+
+The first run creates a `gamecock.db` SQLite database to track downloaded files. Additional modules and features will be added over time.
+
