@@ -2,8 +2,8 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-from . import database, identifiers, search
-from .parser import ncen as ncen_parser, nport as nport_parser
+from . import database, identifiers, search, exposures
+from .parser import ncen as ncen_parser, nport as nport_parser, cftc as cftc_parser
 from . import summarizer
 from .downloader.cftc import (
     CFTCCreditDownloader,
@@ -27,8 +27,11 @@ def main():
     parser.add_argument('--trace-lei', help='Search filings associated with a LEI')
     parser.add_argument('--parse-ncen', nargs='+', type=Path, help='Parse NCEN filing zip files')
     parser.add_argument('--parse-nport', nargs='+', type=Path, help='Parse NPORT filing zip files')
+    parser.add_argument('--parse-cftc', nargs='+', type=Path, help='Parse CFTC swap archives')
     parser.add_argument('--trace-liabilities', help='Trace liability chain for a LEI')
     parser.add_argument('--summarize', type=Path, help='Summarize narrative filing text file')
+    parser.add_argument('--aggregate-exposures', action='store_true', help='Aggregate exposures by LEI')
+    parser.add_argument('--exposure-threshold', type=float, help='Show exposures exceeding threshold')
     args = parser.parse_args()
 
     database.init_db()
@@ -83,12 +86,36 @@ def main():
                     value = 0.0
                 database.record_nport_holding(lei, issuer, cusip, value, accession)
 
+    if args.parse_cftc:
+        for path in args.parse_cftc:
+            for row in cftc_parser.parse(path):
+                lei = row.get('Reporting party ID') or row.get('Lei') or ''
+                d_id = row.get('Dissemination Identifier') or row.get('ID') or ''
+                product = row.get('Product name') or ''
+                try:
+                    notional1 = float(str(row.get('Notional amount-Leg 1') or '0').replace(',', ''))
+                except ValueError:
+                    notional1 = 0.0
+                try:
+                    notional2 = float(str(row.get('Notional amount-Leg 2') or '0').replace(',', ''))
+                except ValueError:
+                    notional2 = 0.0
+                database.record_cftc_swap(d_id, lei, product, notional1, notional2)
+
     if args.trace_liabilities:
         for row in search.trace_liability_chain(args.trace_liabilities):
             print(row)
 
     if args.summarize:
         print(summarizer.summarize_file(args.summarize))
+
+    if args.aggregate_exposures:
+        for row in exposures.aggregate_exposures_by_lei():
+            print(row)
+
+    if args.exposure_threshold is not None:
+        for row in exposures.find_exposure_triggers(args.exposure_threshold):
+            print(row)
 
 
 if __name__ == '__main__':

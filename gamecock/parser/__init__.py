@@ -1,6 +1,6 @@
 """Parser package"""
 
-from . import ncen, nport
+from . import ncen, nport, cftc
 
-__all__ = ["ncen", "nport"]
+__all__ = ["ncen", "nport", "cftc"]
 
